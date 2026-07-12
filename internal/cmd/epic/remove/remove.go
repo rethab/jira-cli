@@ -10,7 +10,6 @@ import (
 
 	"github.com/rethab/jira-cli/api"
 	"github.com/rethab/jira-cli/internal/cmdutil"
-	"github.com/rethab/jira-cli/internal/query"
 	"github.com/rethab/jira-cli/pkg/jira"
 )
 
@@ -37,7 +36,7 @@ func NewCmdRemove() *cobra.Command {
 func remove(cmd *cobra.Command, args []string) {
 	project := viper.GetString("project.key")
 	projectType := viper.GetString("project.type")
-	params := parseFlags(cmd.Flags(), args, project)
+	params := parseFlags(args, project)
 	client := api.DefaultClient(params.debug)
 
 	qs := getQuestions(params)
@@ -100,15 +99,14 @@ func remove(cmd *cobra.Command, args []string) {
 	}
 }
 
-func parseFlags(flags query.FlagParser, args []string, project string) *removeParams {
+func parseFlags(args []string, project string) *removeParams {
 	tickets := args[0:]
 	issues := make([]string, 0, len(tickets))
 	for _, iss := range tickets {
 		issues = append(issues, cmdutil.GetJiraIssueKey(project, iss))
 	}
 
-	debug, err := flags.GetBool("debug")
-	cmdutil.ExitIfError(err)
+	debug := viper.GetBool("debug")
 
 	return &removeParams{
 		issues: issues,
