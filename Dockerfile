@@ -33,9 +33,10 @@ RUN set -eux; \
     make deps; \
     go build -trimpath -ldflags="$(make -s ldflags)" -o /out/jira ./cmd/jira
 
-FROM alpine:3.19
-
-RUN apk --no-cache add ca-certificates
+# Kept free of RUN instructions: they would execute on the target platform
+# and drag QEMU back into CI. The TLS certificates that apk used to install
+# here ship with the base image (ca-certificates-bundle) since Alpine 3.9.
+FROM alpine:3.23
 
 WORKDIR /root/
 
