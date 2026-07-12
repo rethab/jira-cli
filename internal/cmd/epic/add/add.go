@@ -10,7 +10,6 @@ import (
 
 	"github.com/rethab/jira-cli/api"
 	"github.com/rethab/jira-cli/internal/cmdutil"
-	"github.com/rethab/jira-cli/internal/query"
 	"github.com/rethab/jira-cli/pkg/jira"
 )
 
@@ -39,7 +38,7 @@ func add(cmd *cobra.Command, args []string) {
 	server := viper.GetString("server")
 	project := viper.GetString("project.key")
 	projectType := viper.GetString("project.type")
-	params := parseFlags(cmd.Flags(), args, project)
+	params := parseFlags(args, project)
 	client := api.DefaultClient(params.debug)
 
 	qs := getQuestions(params)
@@ -109,7 +108,7 @@ func add(cmd *cobra.Command, args []string) {
 	}
 }
 
-func parseFlags(flags query.FlagParser, args []string, project string) *addParams {
+func parseFlags(args []string, project string) *addParams {
 	var (
 		epicKey string
 		issues  []string

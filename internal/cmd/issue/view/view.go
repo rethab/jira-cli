@@ -66,7 +66,7 @@ func view(cmd *cobra.Command, args []string) {
 	cmdutil.ExitIfError(err)
 
 	if raw {
-		viewRaw(cmd, args)
+		viewRaw(args)
 		return
 	}
 
@@ -81,7 +81,7 @@ func view(cmd *cobra.Command, args []string) {
 	viewPretty(cmd, args)
 }
 
-func viewRaw(cmd *cobra.Command, args []string) {
+func viewRaw(args []string) {
 	debug := viper.GetBool(flagDebug)
 
 	key := cmdutil.GetJiraIssueKey(viper.GetString(configProject), args[0])
