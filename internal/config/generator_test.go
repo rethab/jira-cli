@@ -99,3 +99,45 @@ func TestGetBoardSuggestionsFallsBackToNoneOnError(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigureMetadataUsesNewEndpointForCloud(t *testing.T) {
+	var hitDeprecatedBulkEndpoint, hitNewEndpoint bool
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/rest/api/2/issue/createmeta":
+			// Atlassian has sunset this bulk endpoint for Jira Cloud. Cloud
+			// installations must not hit it anymore.
+			hitDeprecatedBulkEndpoint = true
+			w.WriteHeader(http.StatusNotFound)
+		case "/rest/api/2/issue/createmeta/TEST/issuetypes":
+			hitNewEndpoint = true
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"values":[{"id":"10001","name":"Epic","subtask":false}]}`))
+		case "/rest/api/2/field":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`[]`))
+		default:
+			t.Fatalf("unexpected request to %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	gen := &JiraCLIConfigGenerator{
+		jiraClient: jira.NewClient(jira.Config{Server: server.URL}, jira.WithTimeout(3*time.Second)),
+	}
+	gen.value.installation = jira.InstallationTypeCloud
+	gen.value.project = &projectConf{Key: "TEST"}
+
+	err := gen.configureMetadata()
+	assert.NoError(t, err)
+
+	assert.False(t, hitDeprecatedBulkEndpoint)
+	assert.True(t, hitNewEndpoint)
+
+	assert.Len(t, gen.value.issueTypes, 1)
+	assert.Equal(t, "10001", gen.value.issueTypes[0].ID)
+	assert.Equal(t, "Epic", gen.value.issueTypes[0].Name)
+}
