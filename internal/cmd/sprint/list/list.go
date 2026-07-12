@@ -72,7 +72,10 @@ func SetFlags(cmd *cobra.Command) {
 func sprintList(cmd *cobra.Command, args []string) {
 	server := viper.GetString("server")
 	project := viper.GetString("project.key")
-	boardID := viper.GetInt("board.id")
+
+	boardOverride, err := cmd.Flags().GetInt("board")
+	cmdutil.ExitIfError(err)
+	boardID := resolveBoardID(viper.GetInt("board.id"), boardOverride)
 
 	debug, err := cmd.Flags().GetBool("debug")
 	cmdutil.ExitIfError(err)
@@ -226,7 +229,7 @@ func sprintExplorerView(sprintQuery *query.Sprint, flags query.FlagParser, board
 
 	v := view.SprintList{
 		Project: project,
-		Board:   viper.GetString("board.name"),
+		Board:   resolveBoardName(viper.GetInt("board.id"), viper.GetString("board.name"), boardID),
 		Server:  server,
 		Data:    sprints,
 		Issues: func(boardID, sprintID int) []*jira.Issue {
@@ -265,6 +268,25 @@ func sprintExplorerView(sprintQuery *query.Sprint, flags query.FlagParser, board
 	}
 }
 
+// resolveBoardID returns the board ID to use, preferring the --board override
+// over the board configured during `jira init` when one is given.
+func resolveBoardID(configuredID, override int) int {
+	if override != 0 {
+		return override
+	}
+	return configuredID
+}
+
+// resolveBoardName returns the board name to display. The configured board
+// name only applies to the configured board; for an overridden board we don't
+// know its name without an extra API call, so we display its ID instead.
+func resolveBoardName(configuredID int, configuredName string, boardID int) string {
+	if boardID != configuredID {
+		return strconv.Itoa(boardID)
+	}
+	return configuredName
+}
+
 func getIssueQuery(project string, flags query.FlagParser, showAll bool) (string, error) {
 	q, err := query.NewIssue(project, flags)
 	if err != nil {
@@ -277,6 +299,7 @@ func getIssueQuery(project string, flags query.FlagParser, showAll bool) (string
 }
 
 func setFlags(cmd *cobra.Command) {
+	cmd.Flags().Int("board", 0, "Board ID to fetch sprints from (overrides the configured board)")
 	cmd.Flags().String("state", "", "Filter sprint by its state (comma separated).\n"+
 		"Valid values are future, active and closed.\n"+
 		`Defaults to "active,closed"`)
