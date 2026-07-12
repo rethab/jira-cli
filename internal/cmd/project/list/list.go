@@ -1,7 +1,6 @@
 package list
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -12,24 +11,43 @@ import (
 	"github.com/rethab/jira-cli/pkg/jira"
 )
 
+const (
+	flagRaw = "raw"
+
+	helpText = `List lists Jira projects that a user has access to.`
+	examples = `$ jira project list
+
+# Get the raw Jira API response
+$ jira project list --raw`
+)
+
 // NewCmdList is a list command.
 func NewCmdList() *cobra.Command {
-	cmd := &cobra.Command{
+	cmd := cobra.Command{
 		Use:     "list",
 		Short:   "List lists Jira projects",
-		Long:    "List lists Jira projects that a user has access to.",
+		Long:    helpText,
+		Example: examples,
 		Aliases: []string{"lists", "ls"},
 		Run:     List,
 	}
-	cmd.Flags().Bool("raw", false, "Print raw JSON output")
+	cmd.Flags().Bool(flagRaw, false, "Print raw Jira API response")
 
-	return cmd
+	return &cmd
 }
 
 // List displays a list view.
 func List(cmd *cobra.Command, _ []string) {
 	debug, err := cmd.Flags().GetBool("debug")
 	cmdutil.ExitIfError(err)
+
+	raw, err := cmd.Flags().GetBool(flagRaw)
+	cmdutil.ExitIfError(err)
+
+	if raw {
+		listRaw(debug)
+		return
+	}
 
 	projects, total, err := func() ([]*jira.Project, int, error) {
 		s := cmdutil.Info("Fetching projects...")
@@ -48,24 +66,19 @@ func List(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	raw, err := cmd.Flags().GetBool("raw")
-	cmdutil.ExitIfError(err)
-
-	if raw {
-		outputRawJSON(projects)
-		return
-	}
-
 	v := view.NewProject(projects)
 
 	cmdutil.ExitIfError(v.Render())
 }
 
-func outputRawJSON(projects []*jira.Project) {
-	data, err := json.MarshalIndent(projects, "", "  ")
-	if err != nil {
-		cmdutil.Failed("Failed to marshal projects to JSON: %s", err)
-		return
-	}
-	fmt.Println(string(data))
+func listRaw(debug bool) {
+	apiResp, err := func() (string, error) {
+		s := cmdutil.Info("Fetching projects...")
+		defer s.Stop()
+
+		return api.DefaultClient(debug).ProjectRaw()
+	}()
+	cmdutil.ExitIfError(err)
+
+	fmt.Println(apiResp)
 }
