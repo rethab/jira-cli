@@ -180,6 +180,22 @@ func (i Issue) fragments() []fragment {
 	return append(scraps, newBlankFragment(1), fragment{Body: i.footer()}, newBlankFragment(2))
 }
 
+// fieldSeparator divides inline fields, e.g. the priority and status of a subtask.
+func (i Issue) fieldSeparator() string {
+	if i.Display.Plain {
+		return "|"
+	}
+	return "•"
+}
+
+// ellipsis marks a summary the view had to truncate.
+func (i Issue) ellipsis() string {
+	if i.Display.Plain {
+		return "..."
+	}
+	return "…"
+}
+
 func (i Issue) separator(msg string) string {
 	pad := func(m string) string {
 		if m != "" {
@@ -230,6 +246,21 @@ func (i Issue) header() string {
 	} else if i.Data.Fields.Watches.IsWatching {
 		wch = fmt.Sprintf("You + %d watchers", i.Data.Fields.Watches.WatchCount-1)
 	}
+	if i.Display.Plain {
+		parent := ""
+		if i.Data.Fields.Parent != nil {
+			parent = fmt.Sprintf("  Parent: %s", i.Data.Fields.Parent.Key)
+		}
+		return fmt.Sprintf(
+			"Type: %s  Status: %s  Updated: %s  Assignee: %s  Key: %s%s  Comments: %d  Linked: %d\n# %s\nCreated: %s  Reporter: %s  Priority: %s  Components: %s  Labels: %s  Watchers: %s",
+			it, st, cmdutil.FormatDateTimeHuman(i.Data.Fields.Updated, jira.RFC3339), as, i.Data.Key, parent,
+			i.Data.Fields.Comment.Total, len(i.Data.Fields.IssueLinks),
+			i.Data.Fields.Summary,
+			cmdutil.FormatDateTimeHuman(i.Data.Fields.Created, jira.RFC3339), i.Data.Fields.Reporter.Name,
+			i.Data.Fields.Priority.Name, cmpt, lbl, wch,
+		)
+	}
+
 	parent := ""
 	if i.Data.Fields.Parent != nil {
 		parent = fmt.Sprintf("  👪 %s", i.Data.Fields.Parent.Key)
@@ -296,14 +327,17 @@ func (i Issue) subtasks() string {
 	subtasks.WriteString(
 		fmt.Sprintf("\n %s\n\n", coloredOut("SUBTASKS", color.FgWhite, color.Bold)),
 	)
+	sep := i.fieldSeparator()
 	for idx := range i.Data.Fields.Subtasks {
 		task := i.Data.Fields.Subtasks[idx]
 		subtasks.WriteString(
 			fmt.Sprintf(
-				"  %s %s • %s • %s\n",
+				"  %s %s %s %s %s %s\n",
 				coloredOut(pad(task.Key, maxKeyLen), color.FgGreen, color.Bold),
-				shortenAndPad(task.Fields.Summary, summaryLen),
+				shortenAndPad(task.Fields.Summary, summaryLen, i.ellipsis()),
+				sep,
 				pad(task.Fields.Priority.Name, maxPriorityLen),
+				sep,
 				pad(task.Fields.Status.Name, maxStatusLen),
 			),
 		)
@@ -366,6 +400,7 @@ func (i Issue) linkedIssues() string {
 	// We are sorting keys to respect the order we see in the UI.
 	sort.Strings(keys)
 
+	sep := i.fieldSeparator()
 	for _, k := range keys {
 		linked.WriteString(
 			fmt.Sprintf("\n %s\n\n", coloredOut(strings.ToUpper(k), color.FgWhite, color.Bold)),
@@ -373,11 +408,14 @@ func (i Issue) linkedIssues() string {
 		for _, iss := range linkMap[k] {
 			linked.WriteString(
 				fmt.Sprintf(
-					"  %s %s • %s • %s • %s\n",
+					"  %s %s %s %s %s %s %s %s\n",
 					coloredOut(pad(iss.Key, maxKeyLen), color.FgGreen, color.Bold),
-					shortenAndPad(iss.Fields.Summary, summaryLen),
+					shortenAndPad(iss.Fields.Summary, summaryLen, i.ellipsis()),
+					sep,
 					pad(iss.Fields.IssueType.Name, maxTypeLen),
+					sep,
 					pad(iss.Fields.Priority.Name, maxPriorityLen),
+					sep,
 					pad(iss.Fields.Status.Name, maxStatusLen),
 				),
 			)
@@ -412,13 +450,15 @@ func (i Issue) comments() []issueComment {
 			}
 			return c.Author.Name
 		}
+		sep := i.fieldSeparator()
 		meta := fmt.Sprintf(
-			"\n %s • %s",
+			"\n %s %s %s",
 			coloredOut(authorName(), color.FgWhite, color.Bold),
+			sep,
 			coloredOut(cmdutil.FormatDateTimeHuman(c.Created, jira.RFC3339), color.FgWhite, color.Bold),
 		)
 		if idx == total-1 {
-			meta += fmt.Sprintf(" • %s", coloredOut("Latest comment", color.FgCyan, color.Bold))
+			meta += fmt.Sprintf(" %s %s", sep, coloredOut("Latest comment", color.FgCyan, color.Bold))
 		}
 		comments = append(comments, issueComment{
 			meta: meta,
