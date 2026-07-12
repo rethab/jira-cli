@@ -22,6 +22,7 @@ func TestUserSearch(t *testing.T) {
 		} else {
 			assert.Equal(t, url.Values{
 				"query":      []string{"doe"},
+				"project":    []string{"TEST"},
 				"issueKey":   []string{"ISSUE-1"},
 				"startAt":    []string{"1"},
 				"maxResults": []string{"5"},
@@ -42,6 +43,7 @@ func TestUserSearch(t *testing.T) {
 
 	actual, err := client.UserSearch(&UserSearchOptions{
 		Query:      "doe",
+		Project:    "TEST",
 		IssueKey:   "ISSUE-1",
 		AccountID:  "a123b",
 		StartAt:    1,
@@ -81,6 +83,7 @@ func TestUserSearchV2(t *testing.T) {
 
 		assert.Equal(t, url.Values{
 			"username":   []string{"doe"},
+			"issueKey":   []string{"ISSUE-1"},
 			"startAt":    []string{"1"},
 			"maxResults": []string{"5"},
 			"accountId":  []string{"a123b"},
@@ -99,6 +102,7 @@ func TestUserSearchV2(t *testing.T) {
 
 	actual, err := client.UserSearchV2(&UserSearchOptions{
 		Query:      "doe",
+		IssueKey:   "ISSUE-1",
 		AccountID:  "a123b",
 		StartAt:    1,
 		MaxResults: 5,
@@ -124,6 +128,7 @@ func TestUserSearchV2(t *testing.T) {
 
 	actual, err = client.UserSearchV2(&UserSearchOptions{
 		Query:      "doe",
+		IssueKey:   "ISSUE-1",
 		AccountID:  "a123b",
 		StartAt:    1,
 		MaxResults: 5,
