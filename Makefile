@@ -5,8 +5,11 @@
 ################
 
 GOLANGCI_LINT_VERSION ?= v2.12.2
-GOBIN ?= $(shell go env GOPATH)/bin
-GOLANGCI_LINT ?= $(GOBIN)/golangci-lint
+# Installed into the repository's own bin/ (gitignored), not GOPATH/bin:
+# enforcing the pin there would silently downgrade a golangci-lint the
+# developer keeps for other projects.
+GOLANGCI_LINT_BIN ?= $(CURDIR)/bin
+GOLANGCI_LINT ?= $(GOLANGCI_LINT_BIN)/golangci-lint
 
 ##############
 # Build vars #
@@ -68,7 +71,7 @@ lint: golangci-lint-install
 # findings that do.
 golangci-lint-install:
 	@if [ "$$($(GOLANGCI_LINT) version --short 2>/dev/null)" != "$(GOLANGCI_LINT_VERSION:v%=%)" ]; then \
-		GOBIN="$(GOBIN)" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION); \
+		GOBIN="$(GOLANGCI_LINT_BIN)" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION); \
 	fi
 
 # So CI can key its linter cache on the pinned version without restating it.
