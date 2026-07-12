@@ -188,6 +188,26 @@ func TestPutV2(t *testing.T) {
 	_ = resp.Body.Close()
 }
 
+func TestGetV2_UnexpectedContentType(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte("<html><body>Please sign in</body></html>"))
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+	resp, err := client.GetV2(context.Background(), "/myself", nil)
+
+	assert.Nil(t, resp)
+	assert.Error(t, err)
+
+	var ctErr *ErrUnexpectedContentType
+	assert.ErrorAs(t, err, &ctErr)
+	assert.Equal(t, 200, ctErr.StatusCode)
+	assert.Equal(t, "text/html; charset=utf-8", ctErr.ContentType)
+}
+
 func TestDeleteV2(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/rest/api/2/issue/TEST-1", r.URL.Path)

@@ -42,6 +42,26 @@ var (
 	ErrEmptyResponse = fmt.Errorf("jira: empty response from server")
 )
 
+// ErrUnexpectedContentType denotes a successful HTTP response whose body
+// isn't JSON. This usually means the request never reached the Jira API,
+// for instance because it was intercepted by an SSO/login redirect, a VPN
+// captive portal, or a reverse proxy, or because the configured host
+// doesn't support the requested API version.
+type ErrUnexpectedContentType struct {
+	StatusCode  int
+	ContentType string
+}
+
+func (e *ErrUnexpectedContentType) Error() string {
+	return fmt.Sprintf(
+		"jira: unexpected non-JSON response (status %d, content-type %q); this usually means the request was "+
+			"intercepted (e.g. by a login/SSO page, VPN captive portal, or proxy) or that the configured host "+
+			"doesn't support the requested API version; verify the host and installation type with `jira init`, "+
+			"and re-run with --debug for the full response",
+		e.StatusCode, e.ContentType,
+	)
+}
+
 // ErrUnexpectedResponse denotes response code other than the expected one.
 type ErrUnexpectedResponse struct {
 	Body       Errors
@@ -288,7 +308,20 @@ func (c *Client) request(ctx context.Context, method, endpoint string, body []by
 
 	httpClient := &http.Client{Transport: c.transport}
 
-	return httpClient.Do(req)
+	res, err = httpClient.Do(req)
+	if err != nil {
+		return res, err
+	}
+
+	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusMultipleChoices &&
+		res.ContentLength != 0 && !isJSONContentType(res) {
+		ctErr := &ErrUnexpectedContentType{StatusCode: res.StatusCode, ContentType: res.Header.Get("Content-Type")}
+		_ = res.Body.Close()
+		return nil, ctErr
+	}
+
+	return res, nil
+}
 }
 
 func dump(req *http.Request, res *http.Response) {
