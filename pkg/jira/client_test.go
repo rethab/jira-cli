@@ -198,6 +198,9 @@ func TestGetV2_UnexpectedContentType(t *testing.T) {
 
 	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
 	resp, err := client.GetV2(context.Background(), "/myself", nil)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 
 	assert.Nil(t, resp)
 	assert.Error(t, err)
