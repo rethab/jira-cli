@@ -234,6 +234,12 @@ func handleUserAssign(project, key, assignee string, client *jira.Client) {
 		}
 		return
 	}
+	if assignee == jira.AssigneeDefault {
+		if err := api.ProxyAssignIssue(client, key, nil, jira.AssigneeDefault); err != nil {
+			cmdutil.Failed("Unable to set default assignee: %s", err.Error())
+		}
+		return
+	}
 	user, err := api.ProxyUserSearch(client, &jira.UserSearchOptions{
 		Query:   assignee,
 		Project: project,

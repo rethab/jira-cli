@@ -124,9 +124,9 @@ func (c *Client) assignIssue(key, assignee, ver string) error {
 	aid := new(string)
 	switch assignee {
 	case AssigneeNone:
-		*aid = "-1"
-	case AssigneeDefault:
 		aid = nil
+	case AssigneeDefault:
+		*aid = "-1"
 	default:
 		*aid = assignee
 	}
