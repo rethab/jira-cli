@@ -1,6 +1,7 @@
 on:
+  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, feat/automated-releases]
 
 name: Snapshot
 
