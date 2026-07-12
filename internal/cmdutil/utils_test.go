@@ -1,6 +1,7 @@
 package cmdutil
 
 import (
+	"net"
 	"os"
 	"testing"
 	"time"
@@ -58,6 +59,56 @@ func TestFormatDateTimeHuman(t *testing.T) {
 			assert.Equal(t, tc.expected, tc.format())
 		})
 	}
+}
+
+func TestStdinHasData(t *testing.T) {
+	origStdin := os.Stdin
+	defer func() { os.Stdin = origStdin }()
+
+	t.Run("regular file has data", func(t *testing.T) {
+		f, err := os.CreateTemp(t.TempDir(), "stdin-test")
+		assert.NoError(t, err)
+		defer func() { _ = f.Close() }()
+
+		os.Stdin = f
+
+		assert.True(t, StdinHasData())
+	})
+
+	t.Run("pipe has data", func(t *testing.T) {
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		defer func() { _ = r.Close() }()
+		defer func() { _ = w.Close() }()
+
+		os.Stdin = r
+
+		assert.True(t, StdinHasData())
+	})
+
+	t.Run("socket has no data", func(t *testing.T) {
+		sockDir, err := os.MkdirTemp("", "jira-cli-test")
+		assert.NoError(t, err)
+		defer func() { _ = os.RemoveAll(sockDir) }()
+
+		sockPath := sockDir + "/s.sock"
+
+		ln, err := net.Listen("unix", sockPath)
+		assert.NoError(t, err)
+		defer func() { _ = ln.Close() }()
+
+		client, err := net.Dial("unix", sockPath)
+		assert.NoError(t, err)
+		defer func() { _ = client.Close() }()
+
+		f, err := client.(*net.UnixConn).File()
+		assert.NoError(t, err)
+		defer func() { _ = f.Close() }()
+
+		os.Stdin = f
+
+		assert.False(t, StdinHasData())
+	})
 }
 
 func TestGetConfigHome(t *testing.T) {
