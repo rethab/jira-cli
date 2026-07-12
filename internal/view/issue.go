@@ -72,6 +72,23 @@ func (i Issue) Render() error {
 	return tui.PagerOut(out)
 }
 
+// issuePreviewRenderFn builds a renderFn for tui.WithViewModeFunc that renders the issue
+// fetched by the matching dataFn. It propagates a fetch error (e.g. from api.ProxyGetIssue)
+// instead of letting a nil *jira.Issue reach Issue.RenderedOut and panic.
+func issuePreviewRenderFn(server string, opts IssueOption, renderer *glamour.TermRenderer) func(i any) (string, error) {
+	return func(i any) (string, error) {
+		if err, ok := i.(error); ok {
+			return "", err
+		}
+		iss := Issue{
+			Server:  server,
+			Data:    i.(*jira.Issue),
+			Options: opts,
+		}
+		return iss.RenderedOut(renderer)
+	}
+}
+
 // RenderedOut translates raw data to the format we want to display in.
 func (i Issue) RenderedOut(renderer *glamour.TermRenderer) (string, error) {
 	var res strings.Builder

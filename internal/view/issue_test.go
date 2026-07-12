@@ -2,6 +2,7 @@ package view
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 	"unicode"
@@ -626,4 +627,39 @@ func TestSeparator(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIssuePreviewRenderFnPropagatesFetchError(t *testing.T) {
+	t.Parallel()
+
+	renderer, err := MDRenderer()
+	assert.NoError(t, err)
+
+	renderFn := issuePreviewRenderFn("https://test.local", IssueOption{}, renderer)
+
+	fetchErr := errors.New("failed to fetch issue")
+	out, err := renderFn(fetchErr)
+
+	assert.Equal(t, "", out)
+	assert.Equal(t, fetchErr, err)
+}
+
+func TestIssuePreviewRenderFnRendersIssue(t *testing.T) {
+	t.Parallel()
+
+	renderer, err := MDRenderer()
+	assert.NoError(t, err)
+
+	renderFn := issuePreviewRenderFn("https://test.local", IssueOption{}, renderer)
+
+	data := &jira.Issue{
+		Key: "TEST-1",
+		Fields: jira.IssueFields{
+			Summary: "This is a test",
+		},
+	}
+	out, err := renderFn(data)
+
+	assert.NoError(t, err)
+	assert.Contains(t, out, "TEST-1")
 }
