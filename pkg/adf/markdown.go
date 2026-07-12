@@ -85,11 +85,8 @@ func (tr *MarkdownTranslator) Open(n Connector, _ int) string {
 			nl := true
 			if attrs != nil {
 				a := attrs.(map[string]any)
-				for k := range a {
-					if k == "language" {
-						nl = false
-						break
-					}
+				if _, ok := a["language"]; ok {
+					nl = false
 				}
 			}
 			if nl {
@@ -113,7 +110,7 @@ func (tr *MarkdownTranslator) Open(n Connector, _ int) string {
 					tag.WriteString("\t")
 				}
 				tr.list.counter[tr.list.depthO]++
-				tag.WriteString(fmt.Sprintf("%d. ", tr.list.counter[tr.list.depthO]))
+				fmt.Fprintf(&tag, "%d. ", tr.list.counter[tr.list.depthO])
 			} else {
 				for range tr.list.depthU - 1 {
 					tag.WriteString("\t")
@@ -199,7 +196,7 @@ func (tr *MarkdownTranslator) Close(n Connector) string {
 		case ChildNodeTableRow:
 			tag.WriteString("\n")
 			if tr.table.sep {
-				for i := 0; i < tr.table.cols; i++ {
+				for i := range tr.table.cols {
 					tag.WriteString("---")
 					if i != tr.table.cols-1 {
 						tag.WriteString(" | ")
@@ -245,7 +242,7 @@ func (tr *MarkdownTranslator) setOpenTagAttributes(a any) string {
 		if tr.isValidAttr(k) {
 			switch k {
 			case "language":
-				tag.WriteString(fmt.Sprintf("%s", v))
+				fmt.Fprintf(&tag, "%s", v)
 				nl = true
 			case "level":
 				for range int(v.(float64)) {
@@ -253,7 +250,7 @@ func (tr *MarkdownTranslator) setOpenTagAttributes(a any) string {
 				}
 				tag.WriteString(" ")
 			case "text":
-				tag.WriteString(fmt.Sprintf("%s", v))
+				fmt.Fprintf(&tag, "%s", v)
 				nl = false
 			}
 		}
@@ -274,9 +271,9 @@ func (*MarkdownTranslator) setCloseTagAttributes(a any) string {
 
 	attrs := a.(map[string]any)
 	if h, ok := attrs["href"]; ok {
-		tag.WriteString(fmt.Sprintf("(%s) ", h))
+		fmt.Fprintf(&tag, "(%s) ", h)
 	} else if h, ok := attrs["url"]; ok {
-		tag.WriteString(fmt.Sprintf("%s ", h))
+		fmt.Fprintf(&tag, "%s ", h)
 	}
 
 	return tag.String()

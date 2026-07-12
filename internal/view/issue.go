@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/charmbracelet/glamour"
@@ -397,7 +397,7 @@ func (i Issue) linkedIssues() string {
 	}
 
 	// We are sorting keys to respect the order we see in the UI.
-	sort.Strings(keys)
+	slices.Sort(keys)
 
 	sep := i.fieldSeparator()
 	for _, k := range keys {
@@ -476,7 +476,7 @@ func (i Issue) footer() string {
 		if i.Display.Plain {
 			out.WriteString("\n")
 		}
-		out.WriteString(fmt.Sprintf("%s\n", gray("Use --comments <limit> with `jira issue view` to load more comments")))
+		fmt.Fprintf(&out, "%s\n", gray("Use --comments <limit> with `jira issue view` to load more comments"))
 	}
 	if i.Display.Plain {
 		out.WriteString("\n")
