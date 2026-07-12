@@ -16,12 +16,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # The Makefile builds into $(CURDIR)/.gocache. Naming that same path here is
-  # what makes it cacheable: setup-go reads `go env GOCACHE` to decide what to
-  # save, and without this it dutifully caches ~/.cache/go-build, which the
-  # build then never writes to. Compilation is the expensive part of the jobs
-  # below -- the race-enabled test build especially -- so this is the whole
-  # difference between a warm cache and none at all.
+  # Must stay in step with the Makefile, which builds into $(CURDIR)/.gocache:
+  # the cache steps below can only reach paths inside the workspace.
   GOCACHE: ${{ github.workspace }}/.gocache
 
 jobs:
@@ -39,6 +35,25 @@ jobs:
           # Lint and test on the toolchain the release builds use; a floating
           # constraint would drift CI away from what actually ships.
           go-version-file: 'go.mod'
+          # Not setup-go's cache: its key carries no job discriminator, so every
+          # job here races to save one entry and the fastest wins, leaving the
+          # rest to restore artifacts they cannot use. Hence a per-job cache
+          # below, keyed by what the job actually compiles. The trailing SHA
+          # makes every run save, so the cache follows the source instead of
+          # freezing at the first run; restore falls back to the newest entry
+          # for the same dependencies.
+          cache: false
+
+      - name: Cache Go build and module cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .gocache
+            ~/go/pkg/mod
+          key: go-lint-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-lint-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}-
+            go-lint-${{ runner.os }}-
 
       - name: Resolve pinned linter version
         id: linter
@@ -72,6 +87,18 @@ jobs:
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: 'go.mod'
+          cache: false
+
+      - name: Cache Go build and module cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .gocache
+            ~/go/pkg/mod
+          key: go-test-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-test-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}-
+            go-test-${{ runner.os }}-
 
       - name: Install dependencies
         run: make deps
@@ -121,6 +148,18 @@ jobs:
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: 'go.mod'
+          cache: false
+
+      - name: Cache Go build and module cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .gocache
+            ~/go/pkg/mod
+          key: go-cross-${{ matrix.goos }}-${{ matrix.goarch }}-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-cross-${{ matrix.goos }}-${{ matrix.goarch }}-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}-
+            go-cross-${{ matrix.goos }}-${{ matrix.goarch }}-${{ runner.os }}-
 
       - name: Install dependencies
         run: make deps
