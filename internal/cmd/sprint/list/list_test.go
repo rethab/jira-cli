@@ -309,3 +309,62 @@ func TestShouldRenderSprintsInTable(t *testing.T) {
 		assert.True(t, shouldRenderSprintsInTable(false, false, false, true))
 	})
 }
+
+type testFlagParser struct {
+	jql string
+}
+
+func (tfp *testFlagParser) GetBool(string) (bool, error) { return true, nil }
+
+func (tfp *testFlagParser) GetString(name string) (string, error) {
+	if name == "jql" {
+		return tfp.jql, nil
+	}
+	if name == "order-by" {
+		return "created", nil
+	}
+	return "", nil
+}
+
+func (tfp *testFlagParser) GetStringArray(string) ([]string, error) { return []string{}, nil }
+
+func (tfp *testFlagParser) GetStringToString(string) (map[string]string, error) { return nil, nil }
+
+func (tfp *testFlagParser) GetUint(string) (uint, error) { return 100, nil }
+
+func (tfp *testFlagParser) Set(string, string) error { return nil }
+
+func TestApplyShowAllIssues(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		userJQL     string
+		expectedJQL string
+	}{
+		{
+			name:        "without user-supplied jql",
+			userJQL:     "",
+			expectedJQL: "project IS NOT EMPTY",
+		},
+		{
+			name:        "preserves user-supplied jql",
+			userJQL:     `status="In Progress"`,
+			expectedJQL: `project IS NOT EMPTY AND status="In Progress"`,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			q, err := query.NewIssue("TEST", &testFlagParser{jql: tc.userJQL})
+			assert.NoError(t, err)
+
+			applyShowAllIssues(q)
+
+			assert.Equal(t, tc.expectedJQL, q.Params().JQL)
+		})
+	}
+}
