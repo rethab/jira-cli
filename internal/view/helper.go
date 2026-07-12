@@ -9,6 +9,7 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+	"unicode/utf8"
 
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/glamour"
@@ -212,9 +213,13 @@ func gray256(msg string) string {
 	return fmt.Sprintf("\x1b[38;5;242m%s\x1b[m", msg)
 }
 
-func shortenAndPad(msg string, limit int) string {
-	if limit > 1 && len(msg) > limit {
-		return msg[0:limit-1] + "…"
+// shortenAndPad truncates msg to limit columns, marking the cut with ellipsis.
+// The ellipsis is measured in runes, not bytes, so the result keeps its column
+// width whichever marker the caller passes.
+func shortenAndPad(msg string, limit int, ellipsis string) string {
+	width := utf8.RuneCountInString(ellipsis)
+	if limit > width && len(msg) > limit {
+		return msg[0:limit-width] + ellipsis
 	}
 	return pad(msg, limit)
 }

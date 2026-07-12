@@ -114,36 +114,56 @@ func TestShortenAndPad(t *testing.T) {
 		name     string
 		input    string
 		limit    int
+		ellipsis string
 		expected string
 	}{
 		{
 			name:     "it returns full string for zero limit",
 			input:    "Some text",
 			limit:    0,
+			ellipsis: "…",
 			expected: "Some text",
 		},
 		{
 			name:     "it returns full string if limit is <= 1",
 			input:    "Some text",
 			limit:    1,
+			ellipsis: "…",
 			expected: "Some text",
 		},
 		{
 			name:     "it returns full string if limit is equal to string len",
 			input:    "Some text",
 			limit:    9,
+			ellipsis: "…",
 			expected: "Some text",
 		},
 		{
 			name:     "it returns shortened string",
 			input:    "Some text",
 			limit:    5,
+			ellipsis: "…",
 			expected: "Some…",
+		},
+		{
+			name:     "it shortens to the same width with an ascii ellipsis",
+			input:    "Some text",
+			limit:    5,
+			ellipsis: "...",
+			expected: "So...",
+		},
+		{
+			name:     "it returns full string if limit is not wider than the ascii ellipsis",
+			input:    "Some text",
+			limit:    3,
+			ellipsis: "...",
+			expected: "Some text",
 		},
 		{
 			name:     "it adds padding if string is shorter than the limit",
 			input:    "Some text",
 			limit:    15,
+			ellipsis: "…",
 			expected: "Some text      ",
 		},
 	}
@@ -154,7 +174,7 @@ func TestShortenAndPad(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tc.expected, shortenAndPad(tc.input, tc.limit))
+			assert.Equal(t, tc.expected, shortenAndPad(tc.input, tc.limit, tc.ellipsis))
 		})
 	}
 }
