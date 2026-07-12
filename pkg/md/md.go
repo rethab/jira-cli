@@ -16,6 +16,9 @@ import (
 // mentionPattern matches Jira user mentions, e.g. [~displayname] or [~display name].
 var mentionPattern = regexp.MustCompile(`\[~[^\[\]\n]+\]`)
 
+// nonceSize is the number of random bytes used to build a mention placeholder nonce.
+const nonceSize = 8
+
 // ToJiraMD translates CommonMark to Jira flavored markdown.
 func ToJiraMD(md string) string {
 	if md == "" {
@@ -49,7 +52,7 @@ func ToJiraMD(md string) string {
 // placeholderNonce returns a random token used to make mention placeholders
 // practically impossible to collide with real input text.
 func placeholderNonce() string {
-	b := make([]byte, 8)
+	b := make([]byte, nonceSize)
 	if _, err := rand.Read(b); err != nil {
 		// Extremely unlikely; fall back to a fixed token rather than failing
 		// the whole render.
