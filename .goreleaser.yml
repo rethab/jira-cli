@@ -7,14 +7,15 @@ release:
   draft: false
   mode: "keep-existing"
 
-before:
-  hooks:
-    - go mod tidy
-
 builds:
   - <<: &build_defaults
       binary: bin/jira
       main: ./cmd/jira
+      # Reproducible builds: strip local paths and pin file timestamps to the
+      # commit, so anyone can rebuild the tag and compare checksums.
+      flags:
+        - -trimpath
+      mod_timestamp: "{{ .CommitTimestamp }}"
       ldflags:
         - -s -w
         - -X github.com/ankitpokhrel/jira-cli/internal/version.Version={{.Version}}
@@ -58,6 +59,9 @@ archives:
 checksum:
   name_template: 'checksums.txt'
   algorithm: sha256
+
+sboms:
+  - artifacts: archive
 
 homebrew_casks:
   - name: jira-cli

@@ -77,6 +77,14 @@ Install it with Homebrew from the [tap](https://github.com/rethab/homebrew-jira-
 brew install --cask rethab/jira-cli/jira-cli
 ```
 
+Every release carries [SLSA build provenance](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations): a signed attestation that the archive was built by this repository's release workflow from the tagged commit. To verify a downloaded archive:
+
+```sh
+gh attestation verify jira_1.8.0_macOS_arm64.tar.gz --repo rethab/jira-cli
+```
+
+Each archive also ships an SPDX SBOM (`*.sbom.json` on the release page) listing the full dependency tree, ready for scanners like `grype`.
+
 You can use Docker to quickly try out `jira-cli`.
 
 ```sh
