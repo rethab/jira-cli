@@ -48,12 +48,15 @@ func ToJiraMD(md string) string {
 		// image node's children (the alt text) must be skipped, otherwise
 		// they get concatenated into the same !...! markers by the renderer.
 		// SkipChildren also suppresses the walker's "leaving" visit for this
-		// node, so both markers are written up front while entering.
+		// node, so both markers are emitted up front while entering. They go
+		// through RenderNode rather than the buffer directly because the
+		// renderer tracks how much it last wrote to decide whether a
+		// following block needs a leading newline; writing behind its back
+		// leaves that stale and glues the next table or list onto this line.
 		if node.Type == bf.Image {
 			if entering {
-				buf.WriteString("!")
-				buf.Write(node.Destination)
-				buf.WriteString("!")
+				renderer.RenderNode(&buf, node, true)
+				renderer.RenderNode(&buf, node, false)
 			}
 			return bf.SkipChildren
 		}

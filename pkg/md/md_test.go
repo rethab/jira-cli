@@ -6,6 +6,43 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// An image must not swallow the block separation that follows it: in Jira wiki
+// a table or list that doesn't start on its own line is not rendered.
+func TestToJiraMDKeepsBlockSeparationAfterImage(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "image alone",
+			input:    "![](i.png)\n",
+			expected: "!i.png!\n\n",
+		},
+		{
+			name:     "image followed by paragraph and table",
+			input:    "![](i.png)\n\nsome text\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n",
+			expected: "!i.png!\n\nsome text\n\n||a||b||\n|1|2|\n\n",
+		},
+		{
+			name:     "image followed by paragraph and list",
+			input:    "![](i.png)\n\nsome text\n\n* a\n* b\n",
+			expected: "!i.png!\n\nsome text\n\n* a\n* b\n\n",
+		},
+		{
+			name:     "image with alt text followed by table",
+			input:    "![description](i.png)\n\n| a |\n| --- |\n| 1 |\n",
+			expected: "!i.png!\n\n||a||\n|1|\n\n",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, ToJiraMD(tc.input))
+		})
+	}
+}
+
 func TestToJiraMD(t *testing.T) {
 	jfm := `# H1
 Some _Markdown_ text.
