@@ -53,18 +53,19 @@ func ToJiraMD(md string) string {
 // practically impossible to collide with real input text.
 func placeholderNonce() string {
 	b := make([]byte, nonceSize)
-	if _, err := rand.Read(b); err != nil {
-		// Extremely unlikely; fall back to a fixed token rather than failing
-		// the whole render.
-		return "jiraclimention"
-	}
+	// Since Go 1.24, crypto/rand.Read never returns an error: it panics on
+	// unrecoverable OS failure instead.
+	_, _ = rand.Read(b)
+
 	return hex.EncodeToString(b)
 }
 
 // placeholder returns a marker that is unlikely to appear in real markdown
-// and contains no characters that the confluence renderer would escape.
+// and contains no characters that the confluence renderer would escape. The
+// nonce also terminates the marker so that no placeholder is a prefix of
+// another: otherwise restoring "<nonce>1" would corrupt "<nonce>10".
 func placeholder(nonce string, i int) string {
-	return fmt.Sprintf("%s%d", nonce, i)
+	return fmt.Sprintf("%s%d%s", nonce, i, nonce)
 }
 
 // FromJiraMD translates Jira flavored markdown to CommonMark.

@@ -139,6 +139,26 @@ func TestToJiraMDPreservesMentions(t *testing.T) {
 			input:    `cc [~ankit] and [~jane]`,
 			expected: "cc [~ankit] and [~jane]",
 		},
+		{
+			name:     "more than ten mentions",
+			input:    "[~user0] [~user1] [~user2] [~user3] [~user4] [~user5] [~user6] [~user7] [~user8] [~user9] [~user10] [~user11]",
+			expected: "[~user0] [~user1] [~user2] [~user3] [~user4] [~user5] [~user6] [~user7] [~user8] [~user9] [~user10] [~user11]",
+		},
+		{
+			name:     "mention in inline code",
+			input:    "Use `[~ankit]` here",
+			expected: "Use {{[~ankit]}} here\n\n",
+		},
+		{
+			name:     "mention in code fence",
+			input:    "```\n[~ankit]\n```",
+			expected: "{code}\n[~ankit]\n{code}\n\n",
+		},
+		{
+			name:     "non-mention brackets stay escaped",
+			input:    `a [not a mention] b`,
+			expected: `a \[not a mention\] b`,
+		},
 	}
 
 	for _, tc := range tests {
