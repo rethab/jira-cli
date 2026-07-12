@@ -26,6 +26,12 @@ and --plain flags to display output in different modes.`
 
 	examples = `$ jira sprint list
 
+# Display sprints from a board other than the configured one
+$ jira sprint list --board 42
+
+# Display sprints from a board of another project
+$ jira sprint list --project OTHER --board 42
+
 # Display sprints or sprint issues in an interactive list
 $ jira sprint list --table
 $ jira sprint list <SPRINT_ID> --table
@@ -75,7 +81,7 @@ func sprintList(cmd *cobra.Command, args []string) {
 
 	boardOverride, err := cmd.Flags().GetInt("board")
 	cmdutil.ExitIfError(err)
-	boardID := resolveBoardID(viper.GetInt("board.id"), boardOverride)
+	boardID := resolveBoardID(viper.GetInt("board.id"), boardOverride, cmd.Flags().Changed("board"))
 
 	debug, err := cmd.Flags().GetBool("debug")
 	cmdutil.ExitIfError(err)
@@ -269,9 +275,9 @@ func sprintExplorerView(sprintQuery *query.Sprint, flags query.FlagParser, board
 }
 
 // resolveBoardID returns the board ID to use, preferring the --board override
-// over the board configured during `jira init` when one is given.
-func resolveBoardID(configuredID, override int) int {
-	if override != 0 {
+// over the board configured during `jira init` when the flag was given.
+func resolveBoardID(configuredID, override int, overridden bool) int {
+	if overridden {
 		return override
 	}
 	return configuredID
@@ -282,7 +288,7 @@ func resolveBoardID(configuredID, override int) int {
 // know its name without an extra API call, so we display its ID instead.
 func resolveBoardName(configuredID int, configuredName string, boardID int) string {
 	if boardID != configuredID {
-		return strconv.Itoa(boardID)
+		return fmt.Sprintf("#%d", boardID)
 	}
 	return configuredName
 }
@@ -299,7 +305,9 @@ func getIssueQuery(project string, flags query.FlagParser, showAll bool) (string
 }
 
 func setFlags(cmd *cobra.Command) {
-	cmd.Flags().Int("board", 0, "Board ID to fetch sprints from (overrides the configured board)")
+	cmd.Flags().Int("board", 0, "ID of the board to fetch sprints from, overriding the configured board.\n"+
+		"Sprint issues are still filtered by the current project, so pass --project\n"+
+		"as well when the board belongs to another project")
 	cmd.Flags().String("state", "", "Filter sprint by its state (comma separated).\n"+
 		"Valid values are future, active and closed.\n"+
 		`Defaults to "active,closed"`)

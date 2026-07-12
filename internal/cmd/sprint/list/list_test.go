@@ -7,17 +7,19 @@ func TestResolveBoardID(t *testing.T) {
 		name         string
 		configuredID int
 		override     int
+		overridden   bool
 		want         int
 	}{
-		{name: "no override uses configured board", configuredID: 10, override: 0, want: 10},
-		{name: "override replaces configured board", configuredID: 10, override: 20, want: 20},
+		{name: "flag not given uses configured board", configuredID: 10, override: 0, overridden: false, want: 10},
+		{name: "flag replaces configured board", configuredID: 10, override: 20, overridden: true, want: 20},
+		{name: "flag is honored even when set to zero", configuredID: 10, override: 0, overridden: true, want: 0},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := resolveBoardID(tc.configuredID, tc.override)
+			got := resolveBoardID(tc.configuredID, tc.override, tc.overridden)
 			if got != tc.want {
-				t.Errorf("resolveBoardID(%d, %d) = %d, want %d", tc.configuredID, tc.override, got, tc.want)
+				t.Errorf("resolveBoardID(%d, %d, %t) = %d, want %d", tc.configuredID, tc.override, tc.overridden, got, tc.want)
 			}
 		})
 	}
@@ -43,7 +45,7 @@ func TestResolveBoardName(t *testing.T) {
 			configuredID:   10,
 			configuredName: "My Board",
 			boardID:        20,
-			want:           "20",
+			want:           "#20",
 		},
 	}
 
