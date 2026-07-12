@@ -85,6 +85,12 @@ gh attestation verify jira_1.8.0_macOS_arm64.tar.gz --repo rethab/jira-cli
 
 Each archive also ships an SPDX SBOM (`*.sbom.json` on the release page) listing the full dependency tree, ready for scanners like `grype`.
 
+Every merge to `main` also publishes a snapshot build with the same checksums, provenance, and SBOMs as a release:
+
+```sh
+brew install --cask rethab/jira-cli/jira-cli-snapshot
+```
+
 You can use Docker to quickly try out `jira-cli`.
 
 ```sh

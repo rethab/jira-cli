@@ -1,10 +1,13 @@
 name: Publish a Docker image
 run-name: Docker image for ${{ github.ref_name }}
 
+# Triggered by the tag push, not release-published: releases here are created
+# by workflows using GITHUB_TOKEN, and GitHub suppresses events from that
+# token, so a release trigger would never fire.
 on:
   workflow_dispatch:
-  release:
-    types: [published, prereleased]
+  push:
+    tags: ['v*']
 
 env:
   REGISTRY: ghcr.io

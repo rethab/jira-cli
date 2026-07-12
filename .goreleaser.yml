@@ -7,6 +7,10 @@ release:
   draft: false
   mode: "keep-existing"
 
+snapshot:
+  # Monotonic so Homebrew never sees a snapshot as a downgrade.
+  version_template: "{{ incpatch .Version }}-next.{{ .CommitTimestamp }}.{{ .ShortCommit }}"
+
 builds:
   - <<: &build_defaults
       binary: bin/jira
@@ -87,6 +91,9 @@ homebrew_casks:
 
     url:
       verified: "github.com/rethab/jira-cli/"
+
+    conflicts:
+      - cask: jira-cli-snapshot
 
     hooks:
       post:
