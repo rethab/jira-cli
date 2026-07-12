@@ -71,7 +71,7 @@ func remove(cmd *cobra.Command, args []string) {
 		}
 
 		for _, iss := range params.issues {
-			if err := client.Edit(iss, &jira.EditRequest{ParentIssueKey: jira.AssigneeNone, SkipNotify: true}); err != nil {
+			if err := client.Edit(iss, &jira.EditRequest{ParentIssueKey: jira.AssigneeNone}); err != nil {
 				fmt.Fprintf(&failed, "\n  - %s: %s", iss, cmdutil.NormalizeJiraError(err.Error()))
 			} else {
 				// We will show success message if at-least one request reports success.

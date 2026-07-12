@@ -80,7 +80,7 @@ func add(cmd *cobra.Command, args []string) {
 		// There is no way to send bulk update requests as of now, so we need to send these requests
 		// in a loop. We will print failed requests with exit code 1 at the end if there are any.
 		for _, iss := range params.issues {
-			if err := client.Edit(iss, &jira.EditRequest{ParentIssueKey: params.epicKey, SkipNotify: true}); err != nil {
+			if err := client.Edit(iss, &jira.EditRequest{ParentIssueKey: params.epicKey}); err != nil {
 				fmt.Fprintf(&failed, "\n  - %s: %s", iss, cmdutil.NormalizeJiraError(err.Error()))
 			} else {
 				// We will show success message if at-least one request reports success.
