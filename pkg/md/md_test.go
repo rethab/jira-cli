@@ -24,6 +24,7 @@ Fuga
 ~~strikethrough text~~
 [Example Domain](http://www.example.com/)
 ![](https://path.to/image.jpg)
+![description](https://google.com)
 
 * list1
 * list2
@@ -75,6 +76,7 @@ quote
 -strikethrough text-
 [Example Domain|http://www.example.com/]
 !https://path.to/image.jpg!
+!https://google.com!
 
 * list1
 * list2
