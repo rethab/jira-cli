@@ -5,7 +5,7 @@
 # Pinned to the build platform so Go cross-compiles for the target instead of
 # the whole toolchain running emulated under QEMU. The image is built for four
 # platforms on every merge to main, and emulation makes that take hours.
-FROM --platform=$BUILDPLATFORM golang:1.25-alpine3.23 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine3.23 AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
