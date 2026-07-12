@@ -107,8 +107,7 @@ func parseFlags(flags query.FlagParser, args []string, project string) *removePa
 		issues = append(issues, cmdutil.GetJiraIssueKey(project, iss))
 	}
 
-	debug, err := flags.GetBool("debug")
-	cmdutil.ExitIfError(err)
+	debug := viper.GetBool("debug")
 
 	return &removeParams{
 		issues: issues,

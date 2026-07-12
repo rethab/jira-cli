@@ -127,8 +127,7 @@ func parseFlags(flags query.FlagParser, args []string, project string) *addParam
 		}
 	}
 
-	debug, err := flags.GetBool("debug")
-	cmdutil.ExitIfError(err)
+	debug := viper.GetBool("debug")
 
 	return &addParams{
 		epicKey: epicKey,

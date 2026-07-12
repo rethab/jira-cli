@@ -9,6 +9,7 @@ import (
 	"github.com/rethab/jira-cli/internal/cmdutil"
 	"github.com/rethab/jira-cli/internal/query"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -72,8 +73,7 @@ func parseFlags(flags query.FlagParser, args []string) *addParams {
 		sprintID = args[0]
 	}
 
-	debug, err := flags.GetBool("debug")
-	cmdutil.ExitIfError(err)
+	debug := viper.GetBool("debug")
 
 	return &addParams{
 		sprintID: sprintID,

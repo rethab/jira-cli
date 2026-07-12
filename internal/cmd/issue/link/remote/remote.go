@@ -89,8 +89,7 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *l
 		title = args[2]
 	}
 
-	debug, err := flags.GetBool("debug")
-	cmdutil.ExitIfError(err)
+	debug := viper.GetBool("debug")
 
 	return &linkParams{
 		issueKey: issueKey,

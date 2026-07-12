@@ -135,8 +135,7 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *a
 		user = args[1]
 	}
 
-	debug, err := flags.GetBool("debug")
-	cmdutil.ExitIfError(err)
+	debug := viper.GetBool("debug")
 
 	return &assignParams{
 		key:   key,

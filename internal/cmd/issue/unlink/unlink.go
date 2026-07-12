@@ -91,8 +91,7 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *u
 		outwardIssueKey = cmdutil.GetJiraIssueKey(project, args[1])
 	}
 
-	debug, err := flags.GetBool("debug")
-	cmdutil.ExitIfError(err)
+	debug := viper.GetBool("debug")
 
 	return &unlinkParams{
 		inwardIssueKey:  inwardIssueKey,
