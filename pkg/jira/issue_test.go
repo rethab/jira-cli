@@ -384,17 +384,20 @@ func TestAssignIssue(t *testing.T) {
 	err := client.AssignIssue("TEST-1", "a12b3")
 	assert.NoError(t, err)
 
-	// AssigneeNone should unassign the issue by sending a null accountId.
 	expectedBody = `{"accountId":null}`
 	err = client.AssignIssue("TEST-1", AssigneeNone)
 	assert.NoError(t, err)
 
-	// AssigneeDefault should request the project's default assignee via accountId "-1".
 	expectedBody = `{"accountId":"-1"}`
 	err = client.AssignIssue("TEST-1", AssigneeDefault)
 	assert.NoError(t, err)
 
 	apiVersion2 = true
+
+	expectedBody = `{"name":null}`
+	err = client.AssignIssueV2("TEST-1", AssigneeNone)
+	assert.NoError(t, err)
+
 	expectedBody = `{"name":"-1"}`
 	unexpectedStatusCode = true
 

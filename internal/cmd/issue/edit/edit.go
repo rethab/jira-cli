@@ -228,13 +228,13 @@ func handleUserAssign(project, key, assignee string, client *jira.Client) {
 	if assignee == "" {
 		return
 	}
-	if assignee == "x" {
+	if strings.EqualFold(assignee, cmdcommon.AssigneeUnassign) {
 		if err := api.ProxyAssignIssue(client, key, nil, jira.AssigneeNone); err != nil {
 			cmdutil.Failed("Unable to unassign user: %s", err.Error())
 		}
 		return
 	}
-	if assignee == jira.AssigneeDefault {
+	if strings.EqualFold(assignee, jira.AssigneeDefault) {
 		if err := api.ProxyAssignIssue(client, key, nil, jira.AssigneeDefault); err != nil {
 			cmdutil.Failed("Unable to set default assignee: %s", err.Error())
 		}
