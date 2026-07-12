@@ -69,7 +69,13 @@ nature of the data. Yet, we've attempted to make the experience as similar as po
 | **Jira**  | <a href="#"><img alt="Jira Cloud" src="https://img.shields.io/badge/Jira Cloud-%E2%9C%93-dark--green?logo=jira&style=flat-square" /></a><a href="#"><img alt="Jira Server" src="https://img.shields.io/badge/Jira Server-%E2%9C%93-dark--green?logo=jira&style=flat-square" /></a> |
 
 ## Installation
-`jira-cli` is available as a downloadable packaged binary for Linux, macOS, and Windows from the [releases page](https://github.com/ankitpokhrel/jira-cli/releases).
+`jira-cli` is available as a downloadable packaged binary for Linux, macOS, and Windows from the [releases page](https://github.com/rethab/jira-cli/releases).
+
+Install it with Homebrew from the [tap](https://github.com/rethab/homebrew-jira-cli):
+
+```sh
+brew install --cask rethab/jira-cli/jira-cli
+```
 
 You can use Docker to quickly try out `jira-cli`.
 
