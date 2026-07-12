@@ -130,7 +130,21 @@ func GetConfigHome() (string, error) {
 
 // StdinHasData checks if standard input has any data to be processed.
 func StdinHasData() bool {
-	return !term.IsTerminal(int(os.Stdin.Fd()))
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		return false
+	}
+
+	// Only regular files and named pipes are guaranteed to have data
+	// available and to eventually signal EOF. Other non-terminal fds
+	// (e.g. sockets or open PTY slaves in a subprocess/CI context) can
+	// block forever on read, so we treat those as having no data.
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+
+	mode := info.Mode()
+	return mode&os.ModeNamedPipe != 0 || mode.IsRegular()
 }
 
 // ReadFile reads contents of the given file.
