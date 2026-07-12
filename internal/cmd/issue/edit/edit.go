@@ -79,15 +79,7 @@ func edit(cmd *cobra.Command, args []string) {
 	}()
 	cmdutil.ExitIfError(err)
 
-	var originalBody string
-
-	if issue.Fields.Description != nil {
-		if adfBody, ok := issue.Fields.Description.(*adf.ADF); ok {
-			originalBody = adf.NewTranslator(adfBody, adf.NewJiraMarkdownTranslator()).Translate()
-		} else {
-			originalBody = issue.Fields.Description.(string)
-		}
-	}
+	originalBody := editorBody(issue)
 
 	cmdutil.ExitIfError(ec.askQuestions(issue, originalBody))
 
@@ -128,10 +120,23 @@ func edit(cmd *cobra.Command, args []string) {
 	}
 }
 
-// buildEditRequest constructs the edit request from the parsed params and the
-// existing issue. The description body is always converted from markdown to
-// Jira wiki markup since the edit endpoint (v2) expects wiki markup regardless
-// of whether the original description was ADF (Cloud) or plain text (Server).
+// The editor always works with markdown, and the body coming out of it is always
+// translated back to wiki markup on submit. Cloud serves the description as ADF and
+// Server as wiki markup, so both have to be translated to markdown first, otherwise
+// an unchanged Server description would be re-interpreted as markdown on submit.
+func editorBody(issue *jira.Issue) string {
+	if issue.Fields.Description == nil {
+		return ""
+	}
+	if adfBody, ok := issue.Fields.Description.(*adf.ADF); ok {
+		return adf.NewTranslator(adfBody, adf.NewJiraMarkdownTranslator()).Translate()
+	}
+	return md.FromJiraMD(issue.Fields.Description.(string))
+}
+
+// The description body is always converted from markdown to Jira wiki markup since
+// the edit endpoint (v2) expects wiki markup regardless of whether the original
+// description was ADF (Cloud) or plain text (Server).
 func buildEditRequest(project string, issue *jira.Issue, params *editParams) *jira.EditRequest {
 	labels := params.labels
 	labels = append(labels, issue.Fields.Labels...)
