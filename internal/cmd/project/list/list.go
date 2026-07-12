@@ -1,6 +1,9 @@
 package list
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/rethab/jira-cli/api"
@@ -11,13 +14,16 @@ import (
 
 // NewCmdList is a list command.
 func NewCmdList() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:     "list",
 		Short:   "List lists Jira projects",
 		Long:    "List lists Jira projects that a user has access to.",
 		Aliases: []string{"lists", "ls"},
 		Run:     List,
 	}
+	cmd.Flags().Bool("raw", false, "Print raw JSON output")
+
+	return cmd
 }
 
 // List displays a list view.
@@ -42,7 +48,24 @@ func List(cmd *cobra.Command, _ []string) {
 		return
 	}
 
+	raw, err := cmd.Flags().GetBool("raw")
+	cmdutil.ExitIfError(err)
+
+	if raw {
+		outputRawJSON(projects)
+		return
+	}
+
 	v := view.NewProject(projects)
 
 	cmdutil.ExitIfError(v.Render())
+}
+
+func outputRawJSON(projects []*jira.Project) {
+	data, err := json.MarshalIndent(projects, "", "  ")
+	if err != nil {
+		cmdutil.Failed("Failed to marshal projects to JSON: %s", err)
+		return
+	}
+	fmt.Println(string(data))
 }
