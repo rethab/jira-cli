@@ -114,7 +114,7 @@ func singleSprintView(sprintQuery *query.Sprint, flags query.FlagParser, boardID
 			return nil, err
 		}
 		if sprintQuery.Params().ShowAllIssues {
-			q.Params().JQL = "project IS NOT EMPTY"
+			applyShowAllIssues(q)
 		}
 		resp, err := client.SprintIssues(sprintID, q.Get(), q.Params().From, q.Params().Limit)
 		if err != nil {
@@ -325,9 +325,19 @@ func getIssueQuery(project string, flags query.FlagParser, showAll bool) (string
 		return "", err
 	}
 	if showAll {
-		q.Params().JQL = "project IS NOT EMPTY"
+		applyShowAllIssues(q)
 	}
 	return q.Get(), nil
+}
+
+// applyShowAllIssues expands the query to include issues from all projects,
+// preserving any user-supplied JQL instead of overwriting it.
+func applyShowAllIssues(q *query.Issue) {
+	if q.Params().JQL != "" {
+		q.Params().JQL = "project IS NOT EMPTY AND " + q.Params().JQL
+	} else {
+		q.Params().JQL = "project IS NOT EMPTY"
+	}
 }
 
 func setFlags(cmd *cobra.Command) {
