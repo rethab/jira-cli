@@ -30,8 +30,6 @@ type SprintList struct {
 }
 
 // Render renders the sprint explorer view.
-//
-//nolint:dupl
 func (sl *SprintList) Render() error {
 	renderer, err := MDRenderer()
 	if err != nil {
