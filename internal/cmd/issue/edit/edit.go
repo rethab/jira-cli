@@ -79,14 +79,10 @@ func edit(cmd *cobra.Command, args []string) {
 	}()
 	cmdutil.ExitIfError(err)
 
-	var (
-		isADF        bool
-		originalBody string
-	)
+	var originalBody string
 
 	if issue.Fields.Description != nil {
 		if adfBody, ok := issue.Fields.Description.(*adf.ADF); ok {
-			isADF = true
 			originalBody = adf.NewTranslator(adfBody, adf.NewJiraMarkdownTranslator()).Translate()
 		} else {
 			originalBody = issue.Fields.Description.(string)
@@ -112,6 +108,31 @@ func edit(cmd *cobra.Command, args []string) {
 		params.body = ""
 	}
 
+	edr := buildEditRequest(project, issue, params)
+
+	err = func() error {
+		s := cmdutil.Info("Updating an issue...")
+		defer s.Stop()
+
+		return client.Edit(params.issueKey, edr)
+	}()
+	cmdutil.ExitIfError(err)
+
+	cmdutil.Success("Issue updated\n%s", cmdutil.GenerateServerBrowseURL(server, params.issueKey))
+
+	handleUserAssign(project, params.issueKey, params.assignee, client)
+
+	if web, _ := cmd.Flags().GetBool("web"); web {
+		err := cmdutil.Navigate(server, params.issueKey)
+		cmdutil.ExitIfError(err)
+	}
+}
+
+// buildEditRequest constructs the edit request from the parsed params and the
+// existing issue. The description body is always converted from markdown to
+// Jira wiki markup since the edit endpoint (v2) expects wiki markup regardless
+// of whether the original description was ADF (Cloud) or plain text (Server).
+func buildEditRequest(project string, issue *jira.Issue, params *editParams) *jira.EditRequest {
 	labels := params.labels
 	labels = append(labels, issue.Fields.Labels...)
 
@@ -133,49 +154,29 @@ func edit(cmd *cobra.Command, args []string) {
 	}
 	affectsVersions = append(affectsVersions, params.affectsVersions...)
 
-	err = func() error {
-		s := cmdutil.Info("Updating an issue...")
-		defer s.Stop()
-
-		body := params.body
-		if isADF {
-			body = md.ToJiraMD(body)
-		}
-
-		parent := cmdutil.GetJiraIssueKey(project, params.parentIssueKey)
-		if parent == "" && issue.Fields.Parent != nil {
-			parent = issue.Fields.Parent.Key
-		}
-
-		edr := jira.EditRequest{
-			ParentIssueKey:  parent,
-			Summary:         params.summary,
-			Body:            body,
-			Priority:        params.priority,
-			Labels:          labels,
-			Components:      components,
-			FixVersions:     fixVersions,
-			AffectsVersions: affectsVersions,
-			CustomFields:    params.customFields,
-			SkipNotify:      params.skipNotify,
-		}
-		if configuredCustomFields, err := cmdcommon.GetConfiguredCustomFields(); err == nil {
-			cmdcommon.ValidateCustomFields(edr.CustomFields, configuredCustomFields)
-			edr.WithCustomFields(configuredCustomFields)
-		}
-
-		return client.Edit(params.issueKey, &edr)
-	}()
-	cmdutil.ExitIfError(err)
-
-	cmdutil.Success("Issue updated\n%s", cmdutil.GenerateServerBrowseURL(server, params.issueKey))
-
-	handleUserAssign(project, params.issueKey, params.assignee, client)
-
-	if web, _ := cmd.Flags().GetBool("web"); web {
-		err := cmdutil.Navigate(server, params.issueKey)
-		cmdutil.ExitIfError(err)
+	parent := cmdutil.GetJiraIssueKey(project, params.parentIssueKey)
+	if parent == "" && issue.Fields.Parent != nil {
+		parent = issue.Fields.Parent.Key
 	}
+
+	edr := &jira.EditRequest{
+		ParentIssueKey:  parent,
+		Summary:         params.summary,
+		Body:            md.ToJiraMD(params.body),
+		Priority:        params.priority,
+		Labels:          labels,
+		Components:      components,
+		FixVersions:     fixVersions,
+		AffectsVersions: affectsVersions,
+		CustomFields:    params.customFields,
+		SkipNotify:      params.skipNotify,
+	}
+	if configuredCustomFields, err := cmdcommon.GetConfiguredCustomFields(); err == nil {
+		cmdcommon.ValidateCustomFields(edr.CustomFields, configuredCustomFields)
+		edr.WithCustomFields(configuredCustomFields)
+	}
+
+	return edr
 }
 
 func getAnswers(params *editParams, issue *jira.Issue) {
