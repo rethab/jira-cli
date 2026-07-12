@@ -43,7 +43,7 @@ install:
 
 lint:
 	@if ! command -v golangci-lint > /dev/null 2>&1; then \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.6.2/install.sh | \
 		sh -s -- -b "$$(go env GOPATH)/bin" v2.6.2 ; \
 	fi
 	golangci-lint run ./...
