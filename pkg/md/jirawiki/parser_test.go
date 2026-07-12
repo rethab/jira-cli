@@ -117,6 +117,11 @@ func TestParseTextEffectTags(t *testing.T) {
 			input:    "Line with semicolon inside curly braces {{MySQL::Conn()}}.",
 			expected: "Line with semicolon inside curly braces {{MySQL::Conn()}}.",
 		},
+		{
+			name:     "non-ascii text on a line with bold markup",
+			input:    "Line with *bold* and Ελληνικά and Кириллица and日本語 text.",
+			expected: "Line with **bold** and Ελληνικά and Кириллица and日本語 text.\n",
+		},
 	}
 
 	for _, tc := range cases {

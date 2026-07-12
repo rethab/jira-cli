@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode/utf8"
 )
 
 // Supported Jira wiki tags.
@@ -184,7 +185,9 @@ func secondPass(lines []string) string {
 					end = token.endIdx
 				}
 			} else {
-				out.WriteRune(rune(line[beg]))
+				r, size := utf8.DecodeRuneInString(line[beg:])
+				out.WriteRune(r)
+				end = beg + size - 1
 			}
 
 			end++
