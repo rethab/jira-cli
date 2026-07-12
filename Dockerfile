@@ -11,8 +11,10 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 
-# CI passes the branch or tag being published. Left empty, the Makefile falls
-# back to deriving it from git, which is what a local `docker build` wants.
+# CI passes the branch or tag being published; a tag's v prefix is stripped
+# below because GoReleaser stamps release binaries without it. Left empty,
+# the Makefile falls back to deriving it from git, which is what a local
+# `docker build` wants.
 ARG VERSION=
 
 ENV CGO_ENABLED=0
@@ -29,7 +31,7 @@ RUN apk add -U --no-cache make git
 RUN set -eux; \
     export GOOS="$TARGETOS" GOARCH="$TARGETARCH"; \
     if [ -n "$TARGETVARIANT" ]; then export GOARM="${TARGETVARIANT#v}"; fi; \
-    if [ -z "$VERSION" ]; then unset VERSION; fi; \
+    if [ -z "$VERSION" ]; then unset VERSION; else export VERSION="${VERSION#v}"; fi; \
     make deps; \
     go build -trimpath -ldflags="$(make -s ldflags)" -o /out/jira ./cmd/jira
 
