@@ -107,3 +107,43 @@ func main\(\) {
 
 	assert.Equal(t, expected, ToJiraMD(jfm))
 }
+
+func TestToJiraMDPreservesMentions(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "plain mention",
+			input:    `[~ankit]`,
+			expected: "[~ankit]",
+		},
+		{
+			name:     "mention with display name containing spaces",
+			input:    `[~display name with spaces]`,
+			expected: "[~display name with spaces]",
+		},
+		{
+			name:     "mention inline in text",
+			input:    `Hey [~ankit], can you take a look?`,
+			expected: "Hey [~ankit], can you take a look?",
+		},
+		{
+			name:     "mention inside a list item",
+			input:    "- [~ankit] please review\n- [~jane doe] please approve",
+			expected: "* [~ankit] please review\n* [~jane doe] please approve\n\n",
+		},
+		{
+			name:     "multiple mentions",
+			input:    `cc [~ankit] and [~jane]`,
+			expected: "cc [~ankit] and [~jane]",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, ToJiraMD(tc.input))
+		})
+	}
+}
