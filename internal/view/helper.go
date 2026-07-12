@@ -213,13 +213,13 @@ func gray256(msg string) string {
 	return fmt.Sprintf("\x1b[38;5;242m%s\x1b[m", msg)
 }
 
-// shortenAndPad truncates msg to limit columns, marking the cut with ellipsis.
-// The ellipsis is measured in runes, not bytes, so the result keeps its column
-// width whichever marker the caller passes.
+// shortenAndPad truncates msg to limit runes, marking the cut with ellipsis.
+// Both msg and the ellipsis are measured in runes so multi-byte input is never
+// cut mid-rune and the result keeps its width whichever marker the caller passes.
 func shortenAndPad(msg string, limit int, ellipsis string) string {
 	width := utf8.RuneCountInString(ellipsis)
-	if limit > width && len(msg) > limit {
-		return msg[0:limit-width] + ellipsis
+	if runes := []rune(msg); limit > width && len(runes) > limit {
+		return string(runes[:limit-width]) + ellipsis
 	}
 	return pad(msg, limit)
 }

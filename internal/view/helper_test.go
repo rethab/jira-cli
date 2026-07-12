@@ -160,6 +160,20 @@ func TestShortenAndPad(t *testing.T) {
 			expected: "Some text",
 		},
 		{
+			name:     "it shortens multi-byte input by runes, not bytes",
+			input:    "Département général",
+			limit:    5,
+			ellipsis: "…",
+			expected: "Dépa…",
+		},
+		{
+			name:     "it does not shorten multi-byte input whose rune count is within the limit",
+			input:    "héllo",
+			limit:    5,
+			ellipsis: "…",
+			expected: "héllo",
+		},
+		{
 			name:     "it adds padding if string is shorter than the limit",
 			input:    "Some text",
 			limit:    15,
