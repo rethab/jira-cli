@@ -68,7 +68,7 @@ func TestStdinHasData(t *testing.T) {
 	t.Run("regular file has data", func(t *testing.T) {
 		f, err := os.CreateTemp(t.TempDir(), "stdin-test")
 		assert.NoError(t, err)
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		os.Stdin = f
 
@@ -78,8 +78,8 @@ func TestStdinHasData(t *testing.T) {
 	t.Run("pipe has data", func(t *testing.T) {
 		r, w, err := os.Pipe()
 		assert.NoError(t, err)
-		defer r.Close()
-		defer w.Close()
+		defer func() { _ = r.Close() }()
+		defer func() { _ = w.Close() }()
 
 		os.Stdin = r
 
@@ -89,21 +89,21 @@ func TestStdinHasData(t *testing.T) {
 	t.Run("socket has no data", func(t *testing.T) {
 		sockDir, err := os.MkdirTemp("", "jira-cli-test")
 		assert.NoError(t, err)
-		defer os.RemoveAll(sockDir)
+		defer func() { _ = os.RemoveAll(sockDir) }()
 
 		sockPath := sockDir + "/s.sock"
 
 		ln, err := net.Listen("unix", sockPath)
 		assert.NoError(t, err)
-		defer ln.Close()
+		defer func() { _ = ln.Close() }()
 
 		client, err := net.Dial("unix", sockPath)
 		assert.NoError(t, err)
-		defer client.Close()
+		defer func() { _ = client.Close() }()
 
 		f, err := client.(*net.UnixConn).File()
 		assert.NoError(t, err)
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		os.Stdin = f
 
