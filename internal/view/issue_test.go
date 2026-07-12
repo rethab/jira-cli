@@ -2,6 +2,7 @@ package view
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 	"unicode"
 
@@ -444,6 +445,59 @@ func TestPlainIssueViewKeepsAngleBrackets(t *testing.T) {
 	out := b.String()
 	assert.Contains(t, out, "<Person A>")
 	assert.Contains(t, out, "if (a<b && b>c) {}")
+}
+
+// Known issue: a link inside a table whose URL is longer than the terminal
+// width still leaks one non-ASCII rune into plain output. Glamour truncates
+// the URL with a hardcoded "…" (ansi/table_links.go), which the style config
+// cannot override, so plainMDRenderer can't get rid of it. Fixable, but only
+// by post-processing the rendered output or patching glamour — not worth it
+// so far. This test pins the leak so we notice when a glamour upgrade or a
+// workaround changes the behavior; if it starts failing with no non-ASCII
+// left, delete it and celebrate.
+func TestPlainIssueViewLongTableLinkLeaksEllipsis(t *testing.T) {
+	t.Parallel()
+
+	cell := func(kind string, text string, marks []adf.MarkNode) *adf.Node {
+		return &adf.Node{
+			NodeType: adf.NodeType(kind),
+			Content: []*adf.Node{
+				{
+					NodeType: "paragraph",
+					Content:  []*adf.Node{{NodeType: "text", NodeValue: adf.NodeValue{Text: text, Marks: marks}}},
+				},
+			},
+		}
+	}
+	link := []adf.MarkNode{{
+		MarkType:   "link",
+		Attributes: map[string]any{"href": "https://test.local/" + strings.Repeat("a", 200)},
+	}}
+
+	data := decoratedIssue()
+	data.Fields.Description = &adf.ADF{
+		Version: 1,
+		DocType: "doc",
+		Content: []*adf.Node{
+			{
+				NodeType: "table",
+				Content: []*adf.Node{
+					{NodeType: "tableRow", Content: []*adf.Node{cell("tableHeader", "col a", nil), cell("tableHeader", "col b", nil)}},
+					{NodeType: "tableRow", Content: []*adf.Node{cell("tableCell", "a link", link), cell("tableCell", "plain", nil)}},
+				},
+			},
+		},
+	}
+
+	issue := Issue{
+		Server:  "https://test.local",
+		Data:    data,
+		Display: DisplayFormat{Plain: true},
+	}
+
+	var b bytes.Buffer
+	assert.NoError(t, issue.renderPlain(&b))
+	assert.Equal(t, []string{"…"}, nonASCII(b.String()))
 }
 
 func TestIssueViewKeepsDecorationsWhenNotPlain(t *testing.T) {

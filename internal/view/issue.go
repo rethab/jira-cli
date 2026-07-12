@@ -56,6 +56,9 @@ type Issue struct {
 // Render renders the view.
 func (i Issue) Render() error {
 	if i.Display.Plain || tui.IsDumbTerminal() || tui.IsNotTTY() {
+		// A dumb terminal or a pipe needs the same ASCII-only treatment as an
+		// explicit --plain; everything below renderPlain branches on this flag.
+		i.Display.Plain = true
 		return i.renderPlain(os.Stdout)
 	}
 	r, err := MDRenderer()
