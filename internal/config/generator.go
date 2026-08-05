@@ -619,7 +619,10 @@ func (c *JiraCLIConfigGenerator) configureMetadata() error {
 
 	//nolint:mnd
 	isV9Compatible := c.value.version.major >= 9 || (c.value.version.major == 8 && c.value.version.minor > 4)
-	if c.value.installation == jira.InstallationTypeLocal && isV9Compatible {
+	// Jira Cloud has deprecated the bulk `/issue/createmeta` endpoint used by
+	// configureIssueTypes, so route it through the same per-project
+	// `/issue/createmeta/{project}/issuetypes` endpoint used for Jira Server 9+.
+	if c.value.installation == jira.InstallationTypeCloud || (c.value.installation == jira.InstallationTypeLocal && isV9Compatible) {
 		err = c.configureIssueTypesForJiraServerV9()
 	} else {
 		err = c.configureIssueTypes()
