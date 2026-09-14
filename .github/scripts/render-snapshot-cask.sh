@@ -64,7 +64,11 @@ cask "jira-cli-snapshot" do
 
   binary "bin/jira"
 
-  postflight_steps do
+  # Strips the Gatekeeper quarantine from the unsigned binary. Must run as a
+  # preflight: Homebrew installs generate_completions_from_executable before
+  # any postflight, so a later strip leaves the completion runs to be killed
+  # by Gatekeeper behind a "jira Not Opened" dialog.
+  preflight_steps do
     on_macos do
       run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{staged_path}}/bin/jira"]
     end
