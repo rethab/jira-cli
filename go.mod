@@ -2,7 +2,7 @@ module github.com/rethab/jira-cli
 
 go 1.26.0
 
-toolchain go1.26.5
+toolchain go1.26.8
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
