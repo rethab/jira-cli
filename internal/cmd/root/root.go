@@ -21,6 +21,7 @@ import (
 	"github.com/rethab/jira-cli/internal/cmd/serverinfo"
 	"github.com/rethab/jira-cli/internal/cmd/sprint"
 	"github.com/rethab/jira-cli/internal/cmd/version"
+	"github.com/rethab/jira-cli/internal/cmd/worklog"
 	"github.com/rethab/jira-cli/internal/cmdutil"
 	jiraConfig "github.com/rethab/jira-cli/internal/config"
 	"github.com/rethab/jira-cli/pkg/jira"
@@ -140,6 +141,7 @@ func addChildCommands(cmd *cobra.Command) {
 		completion.NewCmdCompletion(),
 		version.NewCmdVersion(),
 		release.NewCmdRelease(),
+		worklog.NewCmdWorklog(),
 		man.NewCmdMan(),
 	)
 }
