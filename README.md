@@ -570,6 +570,41 @@ $ jira issue worklog add ISSUE-1 "2d 3h 30m" --no-input
 $ jira issue worklog add ISSUE-1 "10m" --comment "This is a comment" --no-input
 ```
 
+##### List
+The `list` command shows an issue's worklogs, newest first. Unlike the worklog field embedded in
+the issue itself, this uses the dedicated worklog endpoint, so it also works for issues with more
+than 20 worklogs.
+
+```sh
+$ jira issue worklog list ISSUE-1
+
+# Show at most 10 entries
+$ jira issue worklog list ISSUE-1 --limit 10
+
+# Page through the oldest entries instead
+$ jira issue worklog list ISSUE-1 --oldest-first --start 40 --limit 20
+```
+
+### Worklog
+
+The `worklog` command shows worklogs logged across issues, independent of any single issue.
+
+#### List
+The `list` command shows what a user logged on a given day, across every issue. Jira has no single
+endpoint for this, so it searches for candidate issues via JQL, then fetches and filters each
+issue's worklogs.
+
+```sh
+# Today's worklogs for the configured user
+$ jira worklog list
+
+# A specific day
+$ jira worklog list --date 2022-01-02
+
+# A different user's worklogs
+$ jira worklog list --user jdoe@example.com
+```
+
 ### Epic
 Epics are displayed in an explorer view by default. You can output the results in a table view using the `--table` flag.
 When viewing epic issues, you can use all filters available for the issue command.
