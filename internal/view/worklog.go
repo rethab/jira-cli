@@ -85,6 +85,7 @@ func (w *IssueWorklogs) data() tui.TableData {
 // WorklogReportEntry is a single row of a cross-issue worklog report.
 type WorklogReportEntry struct {
 	IssueKey         string
+	IssueSummary     string
 	TimeSpent        string
 	TimeSpentSeconds int64
 	Comment          string
@@ -131,7 +132,7 @@ func (w *WorklogReport) Render() error {
 	}
 
 	data := w.data()
-	data = append(data, []string{"TOTAL", formatDuration(w.total()), ""})
+	data = append(data, []string{"TOTAL", "", formatDuration(w.total()), ""})
 
 	if w.Display.Plain {
 		return renderPlain(tabwriter.NewWriter(os.Stdout, 0, tabWidth, 1, '\t', 0), data, "\t")
@@ -144,9 +145,9 @@ func (w *WorklogReport) Render() error {
 
 func (w *WorklogReport) data() tui.TableData {
 	data := make(tui.TableData, 1, 1+len(w.Data))
-	data[0] = []string{"ISSUE", "TIME SPENT", "COMMENT"}
+	data[0] = []string{"ISSUE", "SUMMARY", "TIME SPENT", "COMMENT"}
 	for _, e := range w.Data {
-		data = append(data, []string{e.IssueKey, e.TimeSpent, oneLine(e.Comment)})
+		data = append(data, []string{e.IssueKey, oneLine(e.IssueSummary), e.TimeSpent, oneLine(e.Comment)})
 	}
 	return data
 }

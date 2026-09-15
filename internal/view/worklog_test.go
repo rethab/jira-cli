@@ -41,17 +41,17 @@ func TestWorklogReportRender(t *testing.T) {
 	var b bytes.Buffer
 
 	data := []WorklogReportEntry{
-		{IssueKey: "TEST-1", TimeSpent: "15m", TimeSpentSeconds: 900, Comment: "standup"},
-		{IssueKey: "TEST-2", TimeSpent: "1h 15m", TimeSpentSeconds: 4500, Comment: "sprint planning"},
+		{IssueKey: "TEST-1", IssueSummary: "Fix the thing", TimeSpent: "15m", TimeSpentSeconds: 900, Comment: "standup"},
+		{IssueKey: "TEST-2", IssueSummary: "Ship the other thing", TimeSpent: "1h 15m", TimeSpentSeconds: 4500, Comment: "sprint planning"},
 	}
 
 	w := NewWorklogReport(data, WorklogDisplayFormat{}, WithWorklogReportWriter(&b))
 	assert.NoError(t, w.Render())
 
-	expected := "ISSUE\tTIME SPENT\tCOMMENT\n" +
-		"TEST-1\t15m\tstandup\n" +
-		"TEST-2\t1h 15m\tsprint planning\n" +
-		"TOTAL\t1h 30m\t\n"
+	expected := "ISSUE\tSUMMARY\tTIME SPENT\tCOMMENT\n" +
+		"TEST-1\tFix the thing\t15m\tstandup\n" +
+		"TEST-2\tShip the other thing\t1h 15m\tsprint planning\n" +
+		"TOTAL\t\t1h 30m\t\n"
 	assert.Equal(t, expected, b.String())
 }
 
