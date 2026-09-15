@@ -111,6 +111,9 @@ func worklogEntries(client *jira.Client, user, date string) ([]view.WorklogRepor
 	if err != nil {
 		return nil, fmt.Errorf("searching issues: %w", err)
 	}
+	if !result.IsLast {
+		return nil, fmt.Errorf("more than %d issues match %s; narrow the search (this command doesn't paginate the issue search)", searchLimit, jql)
+	}
 
 	afterMS, beforeMS, err := dayWindow(date)
 	if err != nil {

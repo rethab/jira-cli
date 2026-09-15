@@ -64,6 +64,10 @@ func list(cmd *cobra.Command, args []string) {
 	start, err := cmd.Flags().GetUint("start")
 	cmdutil.ExitIfError(err)
 
+	if cmd.Flags().Changed("start") && !oldestFirst {
+		cmdutil.Failed("--start requires --oldest-first")
+	}
+
 	plain, err := cmd.Flags().GetBool("plain")
 	cmdutil.ExitIfError(err)
 
