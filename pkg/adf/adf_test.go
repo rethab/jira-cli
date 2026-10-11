@@ -89,3 +89,85 @@ func TestADFReplaceAll(t *testing.T) {
 	assert.NotContains(t, string(dump), "Prefix:")
 	assert.Contains(t, string(dump), "Replaced:")
 }
+
+func TestHasMedia(t *testing.T) {
+	text := func(s string) *Node { return &Node{NodeType: ChildNodeText, NodeValue: NodeValue{Text: s}} }
+	para := func(c ...*Node) *Node { return &Node{NodeType: NodeParagraph, Content: c} }
+	media := &Node{NodeType: NodeMedia, Attributes: map[string]any{"id": "abc", "type": "file"}}
+
+	tests := []struct {
+		name string
+		adf  *ADF
+		want bool
+	}{
+		{name: "nil", adf: nil, want: false},
+		{name: "empty", adf: &ADF{}, want: false},
+		{
+			name: "text only",
+			adf:  &ADF{Content: []*Node{para(text("hello"))}},
+			want: false,
+		},
+		{
+			name: "mediaSingle wrapping media",
+			adf: &ADF{Content: []*Node{
+				para(text("before")),
+				{NodeType: NodeMediaSingle, Content: []*Node{media}},
+			}},
+			want: true,
+		},
+		{
+			name: "mediaGroup wrapping media",
+			adf:  &ADF{Content: []*Node{{NodeType: NodeMediaGroup, Content: []*Node{media}}}},
+			want: true,
+		},
+		{
+			name: "mediaSingle without media child",
+			adf:  &ADF{Content: []*Node{{NodeType: NodeMediaSingle}}},
+			want: true,
+		},
+		{
+			name: "mediaInline inside a paragraph",
+			adf:  &ADF{Content: []*Node{para(text("see "), &Node{NodeType: NodeMediaInline})}},
+			want: true,
+		},
+		{
+			name: "media nested in a table cell",
+			adf: &ADF{Content: []*Node{{
+				NodeType: NodeTable,
+				Content: []*Node{{
+					NodeType: ChildNodeTableRow,
+					Content: []*Node{{
+						NodeType: ChildNodeTableCell,
+						Content:  []*Node{{NodeType: NodeMediaSingle, Content: []*Node{media}}},
+					}},
+				}},
+			}}},
+			want: true,
+		},
+		{
+			name: "media nested in a list item",
+			adf: &ADF{Content: []*Node{{
+				NodeType: NodeBulletList,
+				Content: []*Node{{
+					NodeType: ChildNodeListItem,
+					Content:  []*Node{para(text("item")), {NodeType: NodeMediaSingle, Content: []*Node{media}}},
+				}},
+			}}},
+			want: true,
+		},
+		{
+			name: "table and list without media",
+			adf: &ADF{Content: []*Node{
+				{NodeType: NodeTable, Content: []*Node{{NodeType: ChildNodeTableRow, Content: []*Node{{NodeType: ChildNodeTableCell, Content: []*Node{para(text("x"))}}}}}},
+				{NodeType: NodeBulletList, Content: []*Node{{NodeType: ChildNodeListItem, Content: []*Node{para(text("y"))}}}},
+			}},
+			want: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, tc.adf.HasMedia())
+		})
+	}
+}
