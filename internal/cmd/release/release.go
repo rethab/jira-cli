@@ -3,6 +3,7 @@ package release
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/rethab/jira-cli/internal/cmd/release/create"
 	"github.com/rethab/jira-cli/internal/cmd/release/list"
 )
 
@@ -19,7 +20,7 @@ func NewCmdRelease() *cobra.Command {
 		RunE:        releases,
 	}
 
-	cmd.AddCommand(list.NewCmdList())
+	cmd.AddCommand(list.NewCmdList(), create.NewCmdCreate())
 
 	return &cmd
 }
