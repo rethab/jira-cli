@@ -100,6 +100,8 @@ func edit(cmd *cobra.Command, args []string) {
 		params.body = ""
 	}
 
+	cmdutil.ExitIfError(checkImageLoss(issue, params))
+
 	edr := buildEditRequest(project, issue, params)
 
 	err = func() error {
@@ -132,6 +134,25 @@ func editorBody(issue *jira.Issue) string {
 		return adf.NewTranslator(adfBody, adf.NewJiraMarkdownTranslator()).Translate()
 	}
 	return md.FromJiraMD(issue.Fields.Description.(string))
+}
+
+// The editor renders media as a "[attachment]" placeholder and the description is
+// submitted as wiki markup, so replacing a description that embeds media makes Jira
+// drop the images and delete their attachments. Only Cloud descriptions (ADF) can
+// embed media.
+func checkImageLoss(issue *jira.Issue, params *editParams) error {
+	if params.body == "" || params.allowImageLoss {
+		return nil
+	}
+	doc, ok := issue.Fields.Description.(*adf.ADF)
+	if !ok || !doc.HasMedia() {
+		return nil
+	}
+	return fmt.Errorf(
+		"the description of %s contains inline images or attachments that would be deleted if the description is replaced; "+
+			"use --allow-image-loss to proceed anyway, or edit the description in the Jira web UI",
+		params.issueKey,
+	)
 }
 
 // The description body is always converted from markdown to Jira wiki markup since
@@ -326,6 +347,7 @@ type editParams struct {
 	affectsVersions []string
 	customFields    map[string]string
 	skipNotify      bool
+	allowImageLoss  bool
 	noInput         bool
 	debug           bool
 }
@@ -364,6 +386,9 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 	skipNotify, err := flags.GetBool("skip-notify")
 	cmdutil.ExitIfError(err)
 
+	allowImageLoss, err := flags.GetBool("allow-image-loss")
+	cmdutil.ExitIfError(err)
+
 	noInput, err := flags.GetBool("no-input")
 	cmdutil.ExitIfError(err)
 
@@ -382,6 +407,7 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 		affectsVersions: affectsVersions,
 		customFields:    custom,
 		skipNotify:      skipNotify,
+		allowImageLoss:  allowImageLoss,
 		noInput:         noInput,
 		debug:           debug,
 	}
@@ -464,6 +490,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringArray("affects-version", []string{}, "Add/Append release info (affectsVersions)")
 	cmd.Flags().StringToString("custom", custom, "Edit custom fields")
 	cmd.Flags().Bool("skip-notify", false, "Do not notify watchers about the issue update")
+	cmd.Flags().Bool("allow-image-loss", false, "Replace a description even if its inline images and attachments get deleted")
 	cmd.Flags().Bool("web", false, "Open in web browser after successful update")
 	cmd.Flags().Bool("no-input", false, "Disable prompt for non-required fields")
 }

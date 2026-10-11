@@ -60,6 +60,9 @@ Features not available upstream:
 - **Scoped API tokens**: `jira init --installation cloud --scoped-token` looks up your site's cloud ID and configures
   the Atlassian API gateway as the server, so tokens created with scopes work. Browser links keep using your site
   URL. See [Cloud server](#cloud-server). ([upstream #850](https://github.com/ankitpokhrel/jira-cli/issues/850))
+- **Guard against losing inline images**: `jira issue edit` refuses to replace a description that embeds images or
+  attachments, since Jira would delete them, unless `--allow-image-loss` is passed.
+  ([upstream #1005](https://github.com/ankitpokhrel/jira-cli/issues/1005))
 - **Verifiable builds**: every release ships SLSA provenance and an SBOM, and every merge to `main` publishes a snapshot
   Homebrew cask and Docker image. See [Installation](#installation).
 
@@ -414,6 +417,10 @@ $ jira issue edit ISSUE-1 -s"New Bug" -yHigh -lbug -lurgent -CBackend -b"Bug des
 
 # Use --no-input option to disable interactive prompt
 $ jira issue edit ISSUE-1 -s"New updated summary" --no-input
+
+# Replacing a description that contains inline images or attachments would delete them,
+# so the command refuses unless you explicitly accept the loss
+$ jira issue edit ISSUE-1 -b"New description" --allow-image-loss
 
 # Use minus (-) to remove label, component or fixVersion
 # For instance, to edit issue to

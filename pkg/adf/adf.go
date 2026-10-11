@@ -23,6 +23,9 @@ const (
 	NodeParagraph   = NodeType("paragraph")
 	NodeTable       = NodeType("table")
 	NodeMedia       = NodeType("media")
+	NodeMediaSingle = NodeType("mediaSingle")
+	NodeMediaGroup  = NodeType("mediaGroup")
+	NodeMediaInline = NodeType("mediaInline")
 
 	ChildNodeText        = NodeType("text")
 	ChildNodeListItem    = NodeType("listItem")
@@ -95,6 +98,26 @@ func (a *ADF) replace(n *Node, old, new string) {
 	if n.NodeType == ChildNodeText {
 		n.Text = strings.ReplaceAll(n.Text, old, new)
 	}
+}
+
+// HasMedia reports whether the document embeds any media (inline images or
+// attachments) at any depth.
+func (a *ADF) HasMedia() bool {
+	if a == nil {
+		return false
+	}
+	return slices.ContainsFunc(a.Content, (*Node).hasMedia)
+}
+
+func (n *Node) hasMedia() bool {
+	if n == nil {
+		return false
+	}
+	switch n.NodeType {
+	case NodeMedia, NodeMediaSingle, NodeMediaGroup, NodeMediaInline:
+		return true
+	}
+	return slices.ContainsFunc(n.Content, (*Node).hasMedia)
 }
 
 // Node is an ADF content node.

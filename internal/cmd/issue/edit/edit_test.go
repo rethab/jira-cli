@@ -160,3 +160,49 @@ func TestBuildEditRequestMergesIssueFieldsWithParams(t *testing.T) {
 		assert.Equal(t, "TEST-2", edr.ParentIssueKey)
 	})
 }
+
+func TestCheckImageLoss(t *testing.T) {
+	withMedia := &adf.ADF{
+		Version: 1,
+		DocType: "doc",
+		Content: []*adf.Node{
+			{NodeType: adf.NodeMediaSingle, Content: []*adf.Node{{NodeType: adf.NodeMedia}}},
+		},
+	}
+	withoutMedia := &adf.ADF{
+		Version: 1,
+		DocType: "doc",
+		Content: []*adf.Node{
+			{NodeType: adf.NodeParagraph, Content: []*adf.Node{{NodeType: adf.ChildNodeText, NodeValue: adf.NodeValue{Text: "hi"}}}},
+		},
+	}
+
+	tests := []struct {
+		name        string
+		description interface{}
+		params      *editParams
+		wantErr     bool
+	}{
+		{name: "body replaced, description has media", description: withMedia, params: &editParams{body: "new"}, wantErr: true},
+		{name: "override flag allows replacement", description: withMedia, params: &editParams{body: "new", allowImageLoss: true}},
+		{name: "description not touched", description: withMedia, params: &editParams{summary: "new summary"}},
+		{name: "body replaced, no media", description: withoutMedia, params: &editParams{body: "new"}},
+		{name: "server wiki description", description: "!image.png!", params: &editParams{body: "new"}},
+		{name: "no description", description: nil, params: &editParams{body: "new"}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			issue := &jira.Issue{}
+			issue.Fields.Description = tc.description
+
+			err := checkImageLoss(issue, tc.params)
+
+			if tc.wantErr {
+				assert.ErrorContains(t, err, "--allow-image-loss")
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
