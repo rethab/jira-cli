@@ -197,8 +197,12 @@ func quoteAll(values []string) string {
 	return strings.Join(quoted, ", ")
 }
 
+var (
+	// Quoted values are removed first so free text such as `summary ~ "project kickoff"` is not mistaken for a clause.
+	quotedLiteral = regexp.MustCompile(`"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'`)
+	projectClause = regexp.MustCompile(`(?i)(?:^|[^\w.])project\s*(?:!?[=~]|(?:in|not\s+in|is|was|changed)\b)`)
+)
+
 func hasProjectFilter(str string) bool {
-	regx := "(?i)((project)[\\s]*?={0,1}\\b)[^'.']"
-	m, _ := regexp.MatchString(regx, str)
-	return m
+	return projectClause.MatchString(quotedLiteral.ReplaceAllString(str, `""`))
 }
