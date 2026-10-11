@@ -197,8 +197,19 @@ func quoteAll(values []string) string {
 	return strings.Join(quoted, ", ")
 }
 
+var (
+	// Quoted values are removed first so free text such as `summary ~ "project kickoff"` is not mistaken for a clause.
+	quotedLiteral = regexp.MustCompile(`"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'`)
+	projectClause = regexp.MustCompile(`(?i)(?:^|[^\w.])project(?:\s*!?[=~]|\s+(?:in|not\s+in|is|was|changed)\b)`)
+)
+
 func hasProjectFilter(str string) bool {
-	regx := "(?i)((project)[\\s]*?={0,1}\\b)[^'.']"
-	m, _ := regexp.MatchString(regx, str)
-	return m
+	stripped := quotedLiteral.ReplaceAllStringFunc(str, func(lit string) string {
+		// JQL allows quoting field names, so `"project" = TEST` is still a project clause.
+		if strings.EqualFold(lit[1:len(lit)-1], "project") {
+			return "project"
+		}
+		return `""`
+	})
+	return projectClause.MatchString(stripped)
 }

@@ -357,6 +357,74 @@ func TestHasProject(t *testing.T) {
 			expected: false,
 		},
 		{
+			input:    "summary ~ \"project kickoff\"",
+			expected: false,
+		},
+		{
+			input:    "text ~ \"my project notes\"",
+			expected: false,
+		},
+		{
+			input:    "comment ~ 'project review'",
+			expected: false,
+		},
+		{
+			input:    "summary ~ \"project = TEST\"",
+			expected: false,
+		},
+		{
+			input:    "summary ~ \"say \\\"project\\\" in\\\" notes\"",
+			expected: false,
+		},
+		{
+			input:    "summary ~ \"project kickoff\" AND project = TEST",
+			expected: true,
+		},
+		{
+			input:    "project ~ TEST",
+			expected: true,
+		},
+		{
+			input:    "project WAS TEST",
+			expected: true,
+		},
+		{
+			input:    "(project = TEST OR project = TEST1)",
+			expected: true,
+		},
+		{
+			input:    "parent.project = TEST",
+			expected: false,
+		},
+		{
+			input:    "\"project\" = TEST",
+			expected: true,
+		},
+		{
+			input:    "'Project' IN (TEST)",
+			expected: true,
+		},
+		{
+			input:    "summary ~ \"project\"",
+			expected: false,
+		},
+		{
+			input:    "project IN(TEST, TEST1)",
+			expected: true,
+		},
+		{
+			input:    "project NOT IN (TEST)",
+			expected: true,
+		},
+		{
+			input:    "projectis EMPTY",
+			expected: false,
+		},
+		{
+			input:    "status = Done ORDER BY project ASC",
+			expected: false,
+		},
+		{
 			input:    "projectType",
 			expected: false,
 		},
