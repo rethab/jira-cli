@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/rethab/jira-cli/pkg/jira"
 )
@@ -60,15 +61,15 @@ func captureStderr(t *testing.T, fn func()) string {
 
 	orig := os.Stderr
 	r, w, err := os.Pipe()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	os.Stderr = w
 	t.Cleanup(func() { os.Stderr = orig })
 
 	fn()
 
-	assert.NoError(t, w.Close())
+	require.NoError(t, w.Close())
 	out, err := io.ReadAll(r)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return string(out)
 }
 

@@ -1,6 +1,7 @@
 package cmdcommon
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -261,15 +262,9 @@ func ValidateCustomFields(fields map[string]string, configuredFields []jira.Issu
 		return
 	}
 
-	fieldsMap := make(map[string]string)
-	for _, configured := range configuredFields {
-		identifier := strings.ReplaceAll(strings.ToLower(strings.TrimSpace(configured.Name)), " ", "-")
-		fieldsMap[identifier] = configured.Name
-	}
-
 	invalidCustomFields := make([]string, 0, len(fields))
 	for key := range fields {
-		if _, ok := fieldsMap[strings.ToLower(key)]; !ok {
+		if !slices.ContainsFunc(configuredFields, func(c jira.IssueTypeField) bool { return jira.CustomFieldMatches(key, c) }) {
 			invalidCustomFields = append(invalidCustomFields, key)
 		}
 	}
