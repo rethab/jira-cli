@@ -53,6 +53,35 @@ features like issue creation, cloning, linking, ticket transition, and much more
 
 > This tool is heavily inspired by the [GitHub CLI](https://github.com/cli/cli)
 
+## About this fork
+
+This is a fork of [ankitpokhrel/jira-cli](https://github.com/ankitpokhrel/jira-cli). It stays close to upstream, but
+ships bug fixes, dependency updates, and features that have been waiting on upstream for a while. Releases, Homebrew
+casks, and Docker images are published from this repository (see [Installation](#installation)).
+
+### Additional features
+
+Features not available upstream:
+
+- **Worklog listing**: `jira issue worklog list ISSUE-1` lists an issue's worklogs, and `jira worklog list` shows what
+  a user logged on a given day across all issues. See [Worklog](#worklog).
+- **Sprints from another board**: `jira sprint list --board 42` lists sprints of a board other than the one configured
+  with `jira init`. ([upstream #847](https://github.com/ankitpokhrel/jira-cli/issues/847))
+- **Description-only issue view**: `jira issue view ISSUE-1 --description` prints only the summary and description, without
+  header, comments, or footer. ([upstream #933](https://github.com/ankitpokhrel/jira-cli/issues/933))
+- **Parent in issue view**: `jira issue view` shows the parent issue key in the header.
+  ([upstream #766](https://github.com/ankitpokhrel/jira-cli/issues/766))
+- **Raw project list**: `jira project list --raw` prints the Jira API response, including the project `id`.
+  ([upstream #885](https://github.com/ankitpokhrel/jira-cli/issues/885))
+- **Exact plain columns**: `jira issue list --plain --columns ...` prints only the requested columns instead of always
+  adding `KEY`. ([upstream #747](https://github.com/ankitpokhrel/jira-cli/issues/747))
+- **Readable error on non-JSON responses**: when an SSO redirect, VPN portal, or proxy answers with HTML, the error says
+  so instead of `invalid character '<'`. ([upstream #630](https://github.com/ankitpokhrel/jira-cli/issues/630))
+- **Verifiable builds**: every release ships SLSA provenance and an SBOM, and every merge to `main` publishes a snapshot
+  Homebrew cask and Docker image. See [Installation](#installation).
+
+The fork also fixes a number of open upstream bugs; see the [commit history](https://github.com/rethab/jira-cli/commits/main).
+
 ## Supported platforms
 > [!NOTE]
 > Some features might work slightly differently in Jira Cloud versus on-premises installations due to the
@@ -451,6 +480,9 @@ not be the latest one if you for some reason have more than 5k comments in a tic
 ```sh
 # Show 5 recent comments when viewing the issue
 $ jira issue view ISSUE-1 --comments 5
+
+# Print only the summary and description, e.g. to feed into another tool
+$ jira issue view ISSUE-1 --description
 ```
 
 #### Link
