@@ -12,9 +12,13 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/cloudflare/cloudflared/token"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -201,9 +205,52 @@ func NewClient(c Config, opts ...ClientFunc) *Client {
 		transport.TLSClientConfig.Renegotiation = tls.RenegotiateFreelyAsClient
 	}
 
-	client.transport = transport
+	if c.AuthType != nil && *c.AuthType == AuthTypeCFAccess {
+		token.Init("jira-cli")
+		tempAccessURL, err := url.Parse(c.Server)
+		if err != nil {
+			log.Fatalf("failed to parse server URL: %v", err)
+		}
+		appInfo, err := token.GetAppInfo(tempAccessURL)
+		if err != nil {
+			log.Fatalf("failed to get cloudflared app info: %v", err)
+		}
+		// zerolog.New logs every level, which would print cloudflared's internal debug lines as raw JSON.
+		logger := zerolog.New(os.Stderr).Level(zerolog.InfoLevel)
+		tok, err := token.FetchToken(tempAccessURL, appInfo, false, false, &logger)
+		if err != nil {
+			log.Fatalf("failed to fetch cloudflared token: %v", err)
+		}
+		client.transport = NewCFAccessRoundTripper(tok, tempAccessURL.Host, transport)
+	} else {
+		client.transport = transport
+	}
 
 	return &client
+}
+
+type cfAccessRoundTripper struct {
+	token string
+	host  string
+	rt    http.RoundTripper
+}
+
+// NewCFAccessRoundTripper creates a round tripper that adds the Cf-Access-Token to requests sent to host.
+func NewCFAccessRoundTripper(tok, host string, rt http.RoundTripper) *cfAccessRoundTripper {
+	return &cfAccessRoundTripper{token: tok, host: host, rt: rt}
+}
+
+const cfAccessHeader = "Cf-Access-Token"
+
+func (rt *cfAccessRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Redirects can point at other hosts; the access token must not leak there.
+	if req.URL.Host != rt.host {
+		return rt.rt.RoundTrip(req)
+	}
+	// RoundTripper implementations must not modify the caller's request.
+	req = req.Clone(req.Context())
+	req.Header.Set(cfAccessHeader, rt.token)
+	return rt.rt.RoundTrip(req)
 }
 
 // WithTimeout is a functional opt to attach timeout to the client.

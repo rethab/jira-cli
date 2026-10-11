@@ -179,12 +179,15 @@ See [FAQs](https://github.com/ankitpokhrel/jira-cli/discussions/categories/faqs)
 
 #### Authentication types
 
-The tool supports `basic`, `bearer` (Personal Access Token), and `mtls` (Client Certificates) authentication types. Basic auth is used by
-default.
+The tool supports `basic`, `bearer` (Personal Access Token), `mtls` (Client Certificates), and `cf-access` (Cloudflare Access)
+authentication types. Basic auth is used by default.
 
 * If you want to use PAT, you need to set `JIRA_AUTH_TYPE` as `bearer`.
 * If you want to use `mtls` run `jira init`. Select installation type `Local`, and then select authentication type as `mtls`.
   * In case `JIRA_API_TOKEN` variable is set it will be used together with `mtls`.
+* If your server sits behind Cloudflare Access, run `jira init`, select installation type `Local`, and then select authentication
+  type as `cf-access`. The tool fetches an access token through `cloudflared`'s login flow (opening your browser if needed) and
+  sends it with every request. No `JIRA_API_TOKEN` is required.
 
 #### Shell completion
 Check `jira completion --help` for more info on setting up a Bash/Zsh shell completion.
