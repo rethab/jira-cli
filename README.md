@@ -49,6 +49,8 @@ Features not available upstream:
   header, comments, or footer. ([upstream #933](https://github.com/ankitpokhrel/jira-cli/issues/933))
 - **Parent in issue view**: `jira issue view` shows the parent issue key in the header.
   ([upstream #766](https://github.com/ankitpokhrel/jira-cli/issues/766))
+- **Remote link removal**: `jira issue unlink remote ISSUE-1 https://example.com` removes a remote web link from an
+  issue. ([upstream #1006](https://github.com/ankitpokhrel/jira-cli/issues/1006))
 - **Raw project list**: `jira project list --raw` prints the Jira API response, including the project `id`.
   ([upstream #885](https://github.com/ankitpokhrel/jira-cli/issues/885))
 - **Exact plain columns**: `jira issue list --plain --columns ...` prints only the requested columns instead of always
@@ -488,6 +490,18 @@ $ jira issue unlink
 
 # Pass required parameters to skip prompt
 $ jira issue unlink ISSUE-1 ISSUE-2
+```
+
+##### Remote
+The `remote` command lets you remove a remote web link from an issue. The link is identified by its URL, which must
+match exactly. If the issue has several remote links with that URL, all of them are removed.
+
+```sh
+# Removes a remote web link using an interactive prompt
+$ jira issue unlink remote
+
+# Pass required parameters to skip prompt
+$ jira issue unlink remote ISSUE-1 https://example.com
 ```
 
 #### Clone

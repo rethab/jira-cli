@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/rethab/jira-cli/api"
+	"github.com/rethab/jira-cli/internal/cmd/issue/unlink/remote"
 	"github.com/rethab/jira-cli/internal/cmdutil"
 	"github.com/rethab/jira-cli/pkg/jira"
 )
@@ -32,7 +33,8 @@ func NewCmdUnlink() *cobra.Command {
 		Run: unlink,
 	}
 
-	cmd.Flags().Bool("web", false, "Open inward issue in web browser after successful unlinking")
+	cmd.AddCommand(remote.NewCmdRemoteUnlink())
+	cmd.PersistentFlags().Bool("web", false, "Open issue in web browser after successful unlinking")
 
 	return &cmd
 }

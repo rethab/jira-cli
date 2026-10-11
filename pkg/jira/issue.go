@@ -422,19 +422,13 @@ func ifaceToADF(v any) *adf.ADF {
 }
 
 type remotelinkRequest struct {
-	RemoteObject struct {
-		URL   string `json:"url"`
-		Title string `json:"title"`
-	} `json:"object"`
+	RemoteObject RemoteLinkObject `json:"object"`
 }
 
 // RemoteLinkIssue adds a remote link to an issue using POST /issue/{issueId}/remotelink endpoint.
 func (c *Client) RemoteLinkIssue(issueID, title, url string) error {
 	body, err := json.Marshal(remotelinkRequest{
-		RemoteObject: struct {
-			URL   string `json:"url"`
-			Title string `json:"title"`
-		}{Title: title, URL: url},
+		RemoteObject: RemoteLinkObject{Title: title, URL: url},
 	})
 	if err != nil {
 		return err
@@ -455,6 +449,86 @@ func (c *Client) RemoteLinkIssue(issueID, title, url string) error {
 	defer func() { _ = res.Body.Close() }()
 
 	if res.StatusCode != http.StatusCreated {
+		return formatUnexpectedResponse(res)
+	}
+	return nil
+}
+
+// ErrNoRemoteLink denotes that an issue has no remote link with the given URL.
+var ErrNoRemoteLink = fmt.Errorf("jira: no remote link found with the given URL")
+
+// RemoteLinkObject is the web link target of a remote link.
+type RemoteLinkObject struct {
+	URL   string `json:"url"`
+	Title string `json:"title"`
+}
+
+// RemoteLink is a remote web link attached to an issue.
+type RemoteLink struct {
+	ID     int              `json:"id"`
+	Object RemoteLinkObject `json:"object"`
+}
+
+// GetRemoteLinks fetches remote links of an issue using GET /issue/{key}/remotelink endpoint.
+func (c *Client) GetRemoteLinks(key string) ([]*RemoteLink, error) {
+	path := fmt.Sprintf("/issue/%s/remotelink", key)
+
+	res, err := c.GetV2(context.Background(), path, Header{
+		"Accept": "application/json",
+	})
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, ErrEmptyResponse
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, formatUnexpectedResponse(res)
+	}
+
+	var links []*RemoteLink
+	if err := json.NewDecoder(res.Body).Decode(&links); err != nil {
+		return nil, err
+	}
+	return links, nil
+}
+
+// GetRemoteLinkIDs gets the IDs of all remote links of an issue that point to the given URL.
+// Jira allows the same URL to be linked more than once, so there can be several.
+func (c *Client) GetRemoteLinkIDs(key, url string) ([]int, error) {
+	links, err := c.GetRemoteLinks(key)
+	if err != nil {
+		return nil, err
+	}
+
+	var ids []int
+	for _, l := range links {
+		if l.Object.URL == url {
+			ids = append(ids, l.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil, ErrNoRemoteLink
+	}
+	return ids, nil
+}
+
+// DeleteRemoteLink removes a remote link from an issue using DELETE /issue/{key}/remotelink/{linkId} endpoint.
+func (c *Client) DeleteRemoteLink(key string, linkID int) error {
+	path := fmt.Sprintf("/issue/%s/remotelink/%d", key, linkID)
+
+	res, err := c.DeleteV2(context.Background(), path, nil)
+	if err != nil {
+		return err
+	}
+	if res == nil {
+		return ErrEmptyResponse
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	if res.StatusCode != http.StatusNoContent {
 		return formatUnexpectedResponse(res)
 	}
 	return nil
