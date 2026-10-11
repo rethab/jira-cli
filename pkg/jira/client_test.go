@@ -331,10 +331,27 @@ func TestCFAccessRoundTripper(t *testing.T) {
 		"https://jira.example.com", nil)
 	req.Header.Set(cfAccessHeader, "stale-token")
 
-	resp, err := NewCFAccessRoundTripper(token, next).RoundTrip(req)
+	resp, err := NewCFAccessRoundTripper(token, "jira.example.com", next).RoundTrip(req)
 
 	assert.NoError(t, err)
 	assert.Same(t, wantResponse, resp)
+	assert.Equal(t, "stale-token", req.Header.Get(cfAccessHeader))
+
+	_ = resp.Body.Close()
+}
+
+func TestCFAccessRoundTripperSkipsOtherHosts(t *testing.T) {
+	next := mockRoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		assert.Empty(t, req.Header.Get(cfAccessHeader))
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
+	})
+
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet,
+		"https://cdn.example.com/attachment", nil)
+
+	resp, err := NewCFAccessRoundTripper("tmp-access-token", "jira.example.com", next).RoundTrip(req)
+
+	assert.NoError(t, err)
 
 	_ = resp.Body.Close()
 }

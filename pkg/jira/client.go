@@ -215,12 +215,13 @@ func NewClient(c Config, opts ...ClientFunc) *Client {
 		if err != nil {
 			log.Fatalf("failed to get cloudflared app info: %v", err)
 		}
-		logger := zerolog.New(os.Stderr)
+		// zerolog.New logs every level, which would print cloudflared's internal debug lines as raw JSON.
+		logger := zerolog.New(os.Stderr).Level(zerolog.InfoLevel)
 		tok, err := token.FetchToken(tempAccessURL, appInfo, false, false, &logger)
 		if err != nil {
 			log.Fatalf("failed to fetch cloudflared token: %v", err)
 		}
-		client.transport = NewCFAccessRoundTripper(tok, transport)
+		client.transport = NewCFAccessRoundTripper(tok, tempAccessURL.Host, transport)
 	} else {
 		client.transport = transport
 	}
@@ -230,17 +231,24 @@ func NewClient(c Config, opts ...ClientFunc) *Client {
 
 type cfAccessRoundTripper struct {
 	token string
+	host  string
 	rt    http.RoundTripper
 }
 
-// NewCFAccessRoundTripper creates a round tripper that fetches and adds Cf-Access-Tokens to all requests.
-func NewCFAccessRoundTripper(tok string, rt http.RoundTripper) *cfAccessRoundTripper {
-	return &cfAccessRoundTripper{tok, rt}
+// NewCFAccessRoundTripper creates a round tripper that adds the Cf-Access-Token to requests sent to host.
+func NewCFAccessRoundTripper(tok, host string, rt http.RoundTripper) *cfAccessRoundTripper {
+	return &cfAccessRoundTripper{token: tok, host: host, rt: rt}
 }
 
 const cfAccessHeader = "Cf-Access-Token"
 
 func (rt *cfAccessRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Redirects can point at other hosts; the access token must not leak there.
+	if req.URL.Host != rt.host {
+		return rt.rt.RoundTrip(req)
+	}
+	// RoundTripper implementations must not modify the caller's request.
+	req = req.Clone(req.Context())
 	req.Header.Set(cfAccessHeader, rt.token)
 	return rt.rt.RoundTrip(req)
 }
