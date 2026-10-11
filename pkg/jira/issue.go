@@ -460,6 +460,81 @@ func (c *Client) RemoteLinkIssue(issueID, title, url string) error {
 	return nil
 }
 
+// ErrNoRemoteLink denotes that an issue has no remote link with the given URL.
+var ErrNoRemoteLink = fmt.Errorf("jira: no remote link found with the given URL")
+
+// RemoteLinkObject is the web link target of a remote link.
+type RemoteLinkObject struct {
+	URL   string `json:"url"`
+	Title string `json:"title"`
+}
+
+// RemoteLink is a remote web link attached to an issue.
+type RemoteLink struct {
+	ID     int              `json:"id"`
+	Object RemoteLinkObject `json:"object"`
+}
+
+// GetRemoteLinks fetches remote links of an issue using GET /issue/{key}/remotelink endpoint.
+func (c *Client) GetRemoteLinks(key string) ([]*RemoteLink, error) {
+	path := fmt.Sprintf("/issue/%s/remotelink", key)
+
+	res, err := c.GetV2(context.Background(), path, Header{
+		"Accept": "application/json",
+	})
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, ErrEmptyResponse
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, formatUnexpectedResponse(res)
+	}
+
+	var links []*RemoteLink
+	if err := json.NewDecoder(res.Body).Decode(&links); err != nil {
+		return nil, err
+	}
+	return links, nil
+}
+
+// GetRemoteLinkID gets the ID of the remote link of an issue that points to the given URL.
+func (c *Client) GetRemoteLinkID(key, url string) (int, error) {
+	links, err := c.GetRemoteLinks(key)
+	if err != nil {
+		return 0, err
+	}
+
+	for _, l := range links {
+		if l.Object.URL == url {
+			return l.ID, nil
+		}
+	}
+	return 0, ErrNoRemoteLink
+}
+
+// DeleteRemoteLink removes a remote link from an issue using DELETE /issue/{key}/remotelink/{linkId} endpoint.
+func (c *Client) DeleteRemoteLink(key string, linkID int) error {
+	path := fmt.Sprintf("/issue/%s/remotelink/%d", key, linkID)
+
+	res, err := c.DeleteV2(context.Background(), path, nil)
+	if err != nil {
+		return err
+	}
+	if res == nil {
+		return ErrEmptyResponse
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	if res.StatusCode != http.StatusNoContent {
+		return formatUnexpectedResponse(res)
+	}
+	return nil
+}
+
 // WatchIssue adds user as a watcher using v2 version of the POST /issue/{key}/watchers endpoint.
 func (c *Client) WatchIssue(key, watcher string) error {
 	return c.watchIssue(key, watcher, apiVersion3)

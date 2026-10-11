@@ -725,6 +725,91 @@ func TestRemoteLinkIssue(t *testing.T) {
 	assertUnexpectedResponse(t, err)
 }
 
+func TestGetRemoteLinks(t *testing.T) {
+	var unexpectedStatusCode bool
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/rest/api/2/issue/TEST-1/remotelink", r.URL.Path)
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "application/json", r.Header.Get("Accept"))
+
+		if unexpectedStatusCode {
+			w.WriteHeader(400)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(`[
+			{"id": 10000, "globalId": "g1", "object": {"url": "https://example.com", "title": "Example"}},
+			{"id": 10001, "object": {"url": "https://other.com", "title": "Other"}}
+		]`))
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+	links, err := client.GetRemoteLinks("TEST-1")
+	assert.NoError(t, err)
+	assert.Equal(t, []*RemoteLink{
+		{ID: 10000, Object: RemoteLinkObject{URL: "https://example.com", Title: "Example"}},
+		{ID: 10001, Object: RemoteLinkObject{URL: "https://other.com", Title: "Other"}},
+	}, links)
+
+	unexpectedStatusCode = true
+
+	_, err = client.GetRemoteLinks("TEST-1")
+	assertUnexpectedResponse(t, err)
+}
+
+func TestDeleteRemoteLink(t *testing.T) {
+	var unexpectedStatusCode bool
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/rest/api/2/issue/TEST-1/remotelink/10000", r.URL.Path)
+		assert.Equal(t, http.MethodDelete, r.Method)
+
+		if unexpectedStatusCode {
+			w.WriteHeader(404)
+		} else {
+			w.WriteHeader(204)
+		}
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+	err := client.DeleteRemoteLink("TEST-1", 10000)
+	assert.NoError(t, err)
+
+	unexpectedStatusCode = true
+
+	err = client.DeleteRemoteLink("TEST-1", 10000)
+	assertUnexpectedResponse(t, err)
+}
+
+func TestGetRemoteLinkID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/rest/api/2/issue/TEST-1/remotelink", r.URL.Path)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(`[
+			{"id": 10000, "object": {"url": "https://example.com", "title": "Example"}},
+			{"id": 10001, "object": {"url": "https://other.com", "title": "Other"}}
+		]`))
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+	id, err := client.GetRemoteLinkID("TEST-1", "https://other.com")
+	assert.NoError(t, err)
+	assert.Equal(t, 10001, id)
+
+	_, err = client.GetRemoteLinkID("TEST-1", "https://missing.com")
+	assert.ErrorIs(t, err, ErrNoRemoteLink)
+}
+
 func TestWatchIssue(t *testing.T) {
 	var (
 		apiVersion2          bool
