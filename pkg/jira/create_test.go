@@ -245,3 +245,40 @@ func TestCreateEpicNextGen(t *testing.T) {
 	_, err = client.CreateV2(&requestData)
 	assertUnexpectedResponse(t, err)
 }
+
+func TestCreateOptionCustomField(t *testing.T) {
+	reason := IssueTypeField{Name: "Reason", Key: "customfield_12345"}
+	reason.Schema.DataType = customFieldFormatOption
+
+	cases := []struct {
+		name   string
+		custom map[string]string
+	}{
+		{name: "key as typed in the config", custom: map[string]string{"Reason": "Some Value"}},
+		{name: "lowercase key", custom: map[string]string{"reason": "Some Value"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			expectedBody := `{"update":{},"fields":{"project":{"key":"TEST"},"issuetype":{"name":"Task"},` +
+				`"summary":"Test","customfield_12345":{"value":"Some Value"}}}`
+
+			testServer := createTestServer{code: 201}
+			server := testServer.serve(t, expectedBody)
+			defer server.Close()
+
+			client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+			requestData := CreateRequest{
+				Project:      "TEST",
+				IssueType:    "Task",
+				Summary:      "Test",
+				CustomFields: tc.custom,
+			}
+			requestData.WithCustomFields([]IssueTypeField{reason})
+
+			_, err := client.CreateV2(&requestData)
+			assert.NoError(t, err)
+		})
+	}
+}

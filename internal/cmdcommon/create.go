@@ -269,7 +269,7 @@ func ValidateCustomFields(fields map[string]string, configuredFields []jira.Issu
 
 	invalidCustomFields := make([]string, 0, len(fields))
 	for key := range fields {
-		if _, ok := fieldsMap[key]; !ok {
+		if _, ok := fieldsMap[strings.ToLower(key)]; !ok {
 			invalidCustomFields = append(invalidCustomFields, key)
 		}
 	}

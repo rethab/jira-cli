@@ -1,11 +1,15 @@
 package cmdcommon
 
 import (
+	"io"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/rethab/jira-cli/pkg/jira"
 )
 
 // jira.IssueTypeField declares only json tags, so viper cannot match the yaml keys
@@ -49,4 +53,53 @@ issue:
 	assert.Equal(t, "customfield_10020", fields[1].Key)
 	assert.Equal(t, "array", fields[1].Schema.DataType)
 	assert.Equal(t, "string", fields[1].Schema.Items)
+}
+
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+
+	orig := os.Stderr
+	r, w, err := os.Pipe()
+	assert.NoError(t, err)
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = orig })
+
+	fn()
+
+	assert.NoError(t, w.Close())
+	out, err := io.ReadAll(r)
+	assert.NoError(t, err)
+	return string(out)
+}
+
+func TestValidateCustomFields(t *testing.T) {
+	reason := jira.IssueTypeField{Name: "Reason", Key: "customfield_12345"}
+	reason.Schema.DataType = "option"
+	points := jira.IssueTypeField{Name: "Story Points", Key: "customfield_10016"}
+	points.Schema.DataType = "number"
+	configured := []jira.IssueTypeField{reason, points}
+
+	cases := []struct {
+		name    string
+		fields  map[string]string
+		invalid string
+	}{
+		{name: "exact identifier", fields: map[string]string{"story-points": "3"}},
+		{name: "name as typed in the config", fields: map[string]string{"Reason": "x"}},
+		{name: "mixed case multi-word", fields: map[string]string{"Story-Points": "3"}},
+		{name: "unknown field", fields: map[string]string{"Nope": "x"}, invalid: "Nope"},
+		{name: "raw key is not an identifier", fields: map[string]string{"customfield_12345": "x"}, invalid: "customfield_12345"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			out := captureStderr(t, func() { ValidateCustomFields(tc.fields, configured) })
+
+			if tc.invalid == "" {
+				assert.Empty(t, out)
+				return
+			}
+			assert.Contains(t, out, "Invalid custom fields used in the command: "+tc.invalid)
+		})
+	}
 }
