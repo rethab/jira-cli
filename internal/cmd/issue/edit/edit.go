@@ -28,6 +28,10 @@ $ jira issue edit ISSUE-1 -s"New Bug" -yHigh -lbug -lurgent -CBackend -b"Bug des
 # Use --no-input option to disable interactive prompt
 $ jira issue edit ISSUE-1 -s"New updated summary" --no-input
 
+# Replacing a description that contains inline images or attachments would delete them,
+# so the command refuses unless you explicitly accept the loss
+$ jira issue edit ISSUE-1 -b"New description" --allow-image-loss
+
 # Use pipe to read the description body directly from standard input
 $ echo "Description from stdin" | jira issue edit ISSUE-1 -s"New updated summary"  --no-input
 
@@ -81,6 +85,11 @@ func edit(cmd *cobra.Command, args []string) {
 
 	originalBody := editorBody(issue)
 
+	// Refuse a --body before the prompts rather than after the user has answered them.
+	if !sameBody(params.body, originalBody) {
+		cmdutil.ExitIfError(checkImageLoss(issue, params))
+	}
+
 	cmdutil.ExitIfError(ec.askQuestions(issue, originalBody))
 
 	if !params.noInput {
@@ -96,7 +105,7 @@ func edit(cmd *cobra.Command, args []string) {
 		params.body = string(b)
 	}
 	// Keep body as is if there were no changes.
-	if params.body != "" && params.body == originalBody {
+	if params.body != "" && sameBody(params.body, originalBody) {
 		params.body = ""
 	}
 
@@ -141,11 +150,7 @@ func editorBody(issue *jira.Issue) string {
 // drop the images and delete their attachments. Only Cloud descriptions (ADF) can
 // embed media.
 func checkImageLoss(issue *jira.Issue, params *editParams) error {
-	if params.body == "" || params.allowImageLoss {
-		return nil
-	}
-	doc, ok := issue.Fields.Description.(*adf.ADF)
-	if !ok || !doc.HasMedia() {
+	if params.body == "" || params.allowImageLoss || !embedsMedia(issue) {
 		return nil
 	}
 	return fmt.Errorf(
@@ -153,6 +158,18 @@ func checkImageLoss(issue *jira.Issue, params *editParams) error {
 			"use --allow-image-loss to proceed anyway, or edit the description in the Jira web UI",
 		params.issueKey,
 	)
+}
+
+func embedsMedia(issue *jira.Issue) bool {
+	doc, ok := issue.Fields.Description.(*adf.ADF)
+	return ok && doc.HasMedia()
+}
+
+// Editors commonly append a trailing newline on save, and the markdown rendered from
+// ADF doesn't end with one when the description ends in media, so trailing whitespace
+// alone must not count as an edit.
+func sameBody(a, b string) bool {
+	return strings.TrimRight(a, " \t\r\n") == strings.TrimRight(b, " \t\r\n")
 }
 
 // The description body is always converted from markdown to Jira wiki markup since
@@ -290,6 +307,23 @@ func (ec *editCmd) askQuestions(issue *jira.Issue, originalBody string) error {
 		return nil
 	}
 
+	ans := struct{ Summary, Body string }{}
+	err := survey.Ask(ec.questions(issue, originalBody), &ans)
+	if err != nil {
+		return err
+	}
+
+	if ec.params.summary == "" {
+		ec.params.summary = ans.Summary
+	}
+	if ec.params.body == "" {
+		ec.params.body = ans.Body
+	}
+
+	return nil
+}
+
+func (ec *editCmd) questions(issue *jira.Issue, originalBody string) []*survey.Question {
 	var qs []*survey.Question
 
 	if ec.params.summary == "" {
@@ -303,35 +337,28 @@ func (ec *editCmd) askQuestions(issue *jira.Issue, originalBody string) error {
 		})
 	}
 
-	if ec.params.body == "" {
-		qs = append(qs, &survey.Question{
-			Name: "body",
-			Prompt: &surveyext.JiraEditor{
-				Editor: &survey.Editor{
-					Message:       "Description",
-					Default:       originalBody,
-					HideDefault:   true,
-					AppendDefault: true,
-				},
-				BlankAllowed: true,
+	if ec.params.body != "" {
+		return qs
+	}
+	// Any change made in the editor would be refused by checkImageLoss, discarding
+	// what the user typed, so don't offer the editor in the first place.
+	if !ec.params.allowImageLoss && embedsMedia(issue) {
+		cmdutil.Warn("Skipping description: it contains inline images or attachments that would be deleted " +
+			"if it is replaced; use --allow-image-loss to edit it anyway")
+		return qs
+	}
+	return append(qs, &survey.Question{
+		Name: "body",
+		Prompt: &surveyext.JiraEditor{
+			Editor: &survey.Editor{
+				Message:       "Description",
+				Default:       originalBody,
+				HideDefault:   true,
+				AppendDefault: true,
 			},
-		})
-	}
-
-	ans := struct{ Summary, Body string }{}
-	err := survey.Ask(qs, &ans)
-	if err != nil {
-		return err
-	}
-
-	if ec.params.summary == "" {
-		ec.params.summary = ans.Summary
-	}
-	if ec.params.body == "" {
-		ec.params.body = ans.Body
-	}
-
-	return nil
+			BlankAllowed: true,
+		},
+	})
 }
 
 type editParams struct {

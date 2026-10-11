@@ -189,6 +189,7 @@ func TestCheckImageLoss(t *testing.T) {
 		{name: "body replaced, no media", description: withoutMedia, params: &editParams{body: "new"}},
 		{name: "server wiki description", description: "!image.png!", params: &editParams{body: "new"}},
 		{name: "no description", description: nil, params: &editParams{body: "new"}},
+		{name: "empty cloud description", description: (*adf.ADF)(nil), params: &editParams{body: "new"}},
 	}
 
 	for _, tc := range tests {
@@ -203,6 +204,51 @@ func TestCheckImageLoss(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestSameBody(t *testing.T) {
+	assert.True(t, sameBody("hi\n\n\n[attachment]", "hi\n\n\n[attachment]\n"))
+	assert.True(t, sameBody("", ""))
+	assert.False(t, sameBody("hi", "hi there"))
+	assert.False(t, sameBody("  code", "code"))
+}
+
+func TestQuestionsSkipDescriptionEditorWhenItEmbedsMedia(t *testing.T) {
+	withMedia := &adf.ADF{
+		Version: 1,
+		DocType: "doc",
+		Content: []*adf.Node{
+			{NodeType: adf.NodeMediaSingle, Content: []*adf.Node{{NodeType: adf.NodeMedia}}},
+		},
+	}
+
+	tests := []struct {
+		name        string
+		description interface{}
+		params      *editParams
+		want        []string
+	}{
+		{name: "description embeds media", description: withMedia, params: &editParams{}, want: []string{"summary"}},
+		{name: "override flag offers the editor", description: withMedia, params: &editParams{allowImageLoss: true}, want: []string{"summary", "body"}},
+		{name: "no media", description: (*adf.ADF)(nil), params: &editParams{}, want: []string{"summary", "body"}},
+		{name: "server wiki description", description: "!image.png!", params: &editParams{}, want: []string{"summary", "body"}},
+		{name: "summary given, description embeds media", description: withMedia, params: &editParams{summary: "s"}, want: nil},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			issue := &jira.Issue{}
+			issue.Fields.Description = tc.description
+			ec := editCmd{params: tc.params}
+
+			var got []string
+			for _, q := range ec.questions(issue, "") {
+				got = append(got, q.Name)
+			}
+
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }
