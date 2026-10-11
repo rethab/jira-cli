@@ -3,11 +3,13 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/core"
@@ -30,6 +32,10 @@ const (
 	optionBack   = "Go-back"
 	optionNone   = "None"
 	lineBreak    = "----------"
+
+	// gatewayServerFmt is the Atlassian API gateway, the only endpoint that accepts scoped API tokens.
+	gatewayServerFmt     = "https://api.atlassian.com/ex/jira/%s"
+	cloudIDLookupTimeout = 15 * time.Second
 )
 
 var (
@@ -37,6 +43,8 @@ var (
 	ErrSkip = fmt.Errorf("skipping config generation")
 	// ErrUnexpectedResponseFormat is returned if the response data is in unexpected format.
 	ErrUnexpectedResponseFormat = fmt.Errorf("unexpected response format")
+	// ErrScopedTokenLocal is returned if a scoped token is requested for a local installation.
+	ErrScopedTokenLocal = fmt.Errorf("scoped API tokens are only available for cloud installations")
 )
 
 // projectConf is a trimmed down version of jira.Project.
@@ -72,6 +80,7 @@ type JiraCLIConfig struct {
 	Board        string
 	Force        bool
 	Insecure     bool
+	ScopedToken  bool
 	MTLS         JiraCLIMTLSConfig
 }
 
@@ -81,6 +90,7 @@ type JiraCLIConfigGenerator struct {
 	value  struct {
 		installation string
 		server       string
+		browseServer string
 		version      struct {
 			major, minor, patch int
 		}
@@ -219,6 +229,10 @@ func (c *JiraCLIConfigGenerator) configureInstallationType() error {
 		}
 
 		c.value.installation = installation
+	}
+
+	if c.usrCfg.ScopedToken && c.value.installation == jira.InstallationTypeLocal {
+		return ErrScopedTokenLocal
 	}
 
 	return nil
@@ -409,7 +423,29 @@ func (c *JiraCLIConfigGenerator) configureServerAndLoginDetails() error {
 		}
 	}
 
+	if c.usrCfg.ScopedToken {
+		if err := c.useScopedTokenServer(&http.Client{Timeout: cloudIDLookupTimeout}); err != nil {
+			return err
+		}
+	}
+
 	return c.verifyLoginDetails(c.value.server, c.value.login)
+}
+
+// useScopedTokenServer points the server at the Atlassian API gateway and keeps the site URL
+// for browser links, since scoped API tokens are rejected by the site URL itself.
+func (c *JiraCLIConfigGenerator) useScopedTokenServer(client *http.Client) error {
+	site := strings.TrimRight(c.value.server, "/")
+
+	cloudID, err := jira.FetchCloudID(client, site)
+	if err != nil {
+		return fmt.Errorf("unable to look up the cloud ID needed for a scoped API token: %w", err)
+	}
+
+	c.value.browseServer = site
+	c.value.server = fmt.Sprintf(gatewayServerFmt, cloudID)
+
+	return nil
 }
 
 func (c *JiraCLIConfigGenerator) verifyLoginDetails(server, login string) error {
@@ -754,6 +790,11 @@ func (c *JiraCLIConfigGenerator) write(path string) (string, error) {
 
 	config.Set("installation", c.value.installation)
 	config.Set("server", c.value.server)
+
+	if c.value.browseServer != "" {
+		config.Set("browse_server", c.value.browseServer)
+	}
+
 	config.Set("login", c.value.login)
 	config.Set("project", c.value.project)
 	config.Set("epic", c.value.epic)
