@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
@@ -33,8 +34,9 @@ const (
 	optionNone   = "None"
 	lineBreak    = "----------"
 
-	// gatewayServerFmt is the Atlassian API gateway, the only endpoint that accepts scoped API tokens.
-	gatewayServerFmt     = "https://api.atlassian.com/ex/jira/%s"
+	// gatewayServerPrefix is the Atlassian API gateway, the only endpoint that accepts scoped API tokens.
+	gatewayServerPrefix  = "https://api.atlassian.com/ex/jira/"
+	gatewayServerFmt     = gatewayServerPrefix + "%s"
 	cloudIDLookupTimeout = 15 * time.Second
 )
 
@@ -424,7 +426,7 @@ func (c *JiraCLIConfigGenerator) configureServerAndLoginDetails() error {
 	}
 
 	if c.usrCfg.ScopedToken {
-		if err := c.useScopedTokenServer(&http.Client{Timeout: cloudIDLookupTimeout}); err != nil {
+		if err := c.useScopedTokenServer(c.cloudIDLookupClient()); err != nil {
 			return err
 		}
 	}
@@ -432,12 +434,34 @@ func (c *JiraCLIConfigGenerator) configureServerAndLoginDetails() error {
 	return c.verifyLoginDetails(c.value.server, c.value.login)
 }
 
+func (c *JiraCLIConfigGenerator) cloudIDLookupClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if c.usrCfg.Insecure {
+		transport.TLSClientConfig = &tls.Config{
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: true, //nolint:gosec // Opt-in via --insecure, which jira init warns about.
+		}
+	}
+	return &http.Client{Timeout: cloudIDLookupTimeout, Transport: transport}
+}
+
 // useScopedTokenServer points the server at the Atlassian API gateway and keeps the site URL
 // for browser links, since scoped API tokens are rejected by the site URL itself.
 func (c *JiraCLIConfigGenerator) useScopedTokenServer(client *http.Client) error {
-	site := strings.TrimRight(c.value.server, "/")
+	if strings.HasPrefix(strings.TrimSpace(c.value.server), gatewayServerPrefix) {
+		return nil
+	}
 
+	// Cloud sites live at the host root; a URL copied from the browser may carry a page path.
+	u, err := url.Parse(strings.TrimSpace(c.value.server))
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return fmt.Errorf("not a valid server URL: %q", c.value.server)
+	}
+	site := u.Scheme + "://" + u.Host
+
+	s := cmdutil.Info("Looking up cloud ID...")
 	cloudID, err := jira.FetchCloudID(client, site)
+	s.Stop()
 	if err != nil {
 		return fmt.Errorf("unable to look up the cloud ID needed for a scoped API token: %w", err)
 	}

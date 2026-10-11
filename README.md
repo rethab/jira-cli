@@ -127,6 +127,8 @@ jira init --installation cloud --server https://<site>.atlassian.net --login you
 The gateway URL is saved as `server`, and your site URL as `browse_server`, so links printed or opened by the tool
 (e.g. `jira open`) still point to your site. Regular API tokens should not use this flag.
 
+If you keep the token in `~/.netrc`, the entry's `machine` must be `api.atlassian.com`, since that is now the server host.
+
 If you already know your cloud ID, you can skip the lookup and pass the gateway URL as the server instead. In that case,
 also set `browse_server` in the generated config to your site URL to keep browser links working:
 
@@ -135,8 +137,10 @@ jira init --installation cloud --server https://api.atlassian.com/ex/jira/<cloud
 ```
 
 A scoped token only allows what its scopes cover, so select scopes for the features you use, such as `read:jira-work`,
-`write:jira-work` and `read:jira-user`. See Atlassian's
-[Jira scopes reference](https://developer.atlassian.com/cloud/jira/platform/scopes-for-oauth-2-3LO-and-forge-apps/).
+`write:jira-work` and `read:jira-user`. Boards and sprints use the Jira Software API, which has its own scopes, such as
+`read:board-scope:jira-software` and `read:sprint:jira-software`. See Atlassian's
+[Jira scopes reference](https://developer.atlassian.com/cloud/jira/platform/scopes-for-oauth-2-3LO-and-forge-apps/) and
+the scopes listed per endpoint in the [Jira Software REST API](https://developer.atlassian.com/cloud/jira/software/rest/intro/).
 
 #### On-premises installation
 

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -109,7 +110,7 @@ func TestUseScopedTokenServer(t *testing.T) {
 	defer site.Close()
 
 	gen := NewJiraCLIConfigGenerator(&JiraCLIConfig{ScopedToken: true})
-	gen.value.server = site.URL + "/"
+	gen.value.server = site.URL + "/jira/your-work"
 
 	assert.NoError(t, gen.useScopedTokenServer(site.Client()))
 	assert.Equal(t, "https://api.atlassian.com/ex/jira/abc-123", gen.value.server)
@@ -129,6 +130,47 @@ func TestUseScopedTokenServerReturnsLookupError(t *testing.T) {
 	assert.ErrorContains(t, err, "cloud ID")
 	assert.Equal(t, site.URL, gen.value.server)
 	assert.Empty(t, gen.value.browseServer)
+}
+
+func TestUseScopedTokenServerKeepsGatewayServer(t *testing.T) {
+	gen := NewJiraCLIConfigGenerator(&JiraCLIConfig{ScopedToken: true})
+	gen.value.server = "https://api.atlassian.com/ex/jira/abc-123"
+
+	assert.NoError(t, gen.useScopedTokenServer(&http.Client{Transport: failingTransport{}}))
+	assert.Equal(t, "https://api.atlassian.com/ex/jira/abc-123", gen.value.server)
+	assert.Empty(t, gen.value.browseServer)
+}
+
+func TestUseScopedTokenServerRejectsInvalidURL(t *testing.T) {
+	gen := NewJiraCLIConfigGenerator(&JiraCLIConfig{ScopedToken: true})
+	gen.value.server = "acme.atlassian.net"
+
+	assert.ErrorContains(t, gen.useScopedTokenServer(&http.Client{Transport: failingTransport{}}), "not a valid server URL")
+}
+
+func TestCloudIDLookupClientHonoursInsecure(t *testing.T) {
+	site := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"cloudId":"abc-123"}`))
+	}))
+	defer site.Close()
+
+	for _, insecure := range []bool{false, true} {
+		gen := NewJiraCLIConfigGenerator(&JiraCLIConfig{ScopedToken: true, Insecure: insecure})
+		gen.value.server = site.URL
+
+		err := gen.useScopedTokenServer(gen.cloudIDLookupClient())
+		if insecure {
+			assert.NoError(t, err)
+		} else {
+			assert.ErrorContains(t, err, "certificate")
+		}
+	}
+}
+
+type failingTransport struct{}
+
+func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errors.New("unexpected request")
 }
 
 func TestWriteBrowseServer(t *testing.T) {
