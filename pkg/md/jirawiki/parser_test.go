@@ -545,7 +545,7 @@ func main() {
 6
 7
 {code}x{code}`,
-			expected: "1\n2\n3\n4\n5\n6\n7\n",
+			expected: "1\n2\n3\n4\n5\n6\n7`x`\n",
 		},
 		{
 			name: "inline noformat on the last line should not cause infinite loop #1033",
@@ -557,7 +557,7 @@ func main() {
 6
 7
 {noformat}x{noformat}`,
-			expected: "1\n2\n3\n4\n5\n6\n7\n",
+			expected: "1\n2\n3\n4\n5\n6\n7`x`\n",
 		},
 		{
 			name: "inline code within text on the last line should not cause infinite loop #1033",
@@ -569,7 +569,25 @@ Line 5
 Line 6
 Line 7
 See {code}SomeName{code} for details.`,
-			expected: "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7See \n",
+			expected: "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7See `SomeName` for details.\n",
+		},
+		{
+			name: "unclosed code block on the last line should not cause infinite loop #1033",
+			input: `1
+2
+3
+4
+5
+6
+7
+{code}`,
+			expected: "1\n2\n3\n4\n5\n6\n7\n",
+		},
+		{
+			name: "inline code before the last line is not treated as a code block",
+			input: `See {code}SomeName{code} for details.
+Last line`,
+			expected: "See `SomeName` for details.\nLast line",
 		},
 	}
 

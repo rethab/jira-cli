@@ -154,6 +154,11 @@ func secondPass(lines []string) string {
 				case typeTagList:
 					end = token.handleList(line, &out)
 				case typeTagFencedCode:
+					if closing, ok := inlineClosingToken(token, tokens); ok {
+						fmt.Fprintf(&out, "`%s`", line[token.endIdx+1:closing.startIdx])
+						end = closing.endIdx
+						break
+					}
 					lineNum = token.handleFencedCodeBlock(lineNum, lines, &out)
 					break out
 				case typeTagReferenceLink:
@@ -505,6 +510,17 @@ func isToken(inp string) bool {
 func tokenStarts(idx int, tokens []*Token) (*Token, bool) {
 	for _, token := range tokens {
 		if idx == token.startIdx {
+			return token, true
+		}
+	}
+	return nil, false
+}
+
+// inlineClosingToken finds a matching closing tag on the same line, which makes
+// the opening tag an inline span (e.g. {code}x{code}) rather than a block fence.
+func inlineClosingToken(open *Token, tokens []*Token) (*Token, bool) {
+	for _, token := range tokens {
+		if token.startIdx > open.endIdx && token.family == typeTagFencedCode && token.tag == open.tag {
 			return token, true
 		}
 	}
