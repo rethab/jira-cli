@@ -8,8 +8,9 @@ import (
 
 func TestRead(t *testing.T) {
 	netrcOnce.Do(func() {})
-	orig := netrc
-	t.Cleanup(func() { netrc = orig })
+	orig, origErr := netrc, netrcErr
+	netrcErr = nil
+	t.Cleanup(func() { netrc, netrcErr = orig, origErr })
 
 	tests := []struct {
 		name    string
@@ -33,8 +34,46 @@ func TestRead(t *testing.T) {
 			server: "https://test.atlassian.net",
 		},
 		{
+			name:   "matches host case-insensitively",
+			data:   "machine https://Test.Atlassian.net login me@sample.org password secret",
+			server: "https://test.atlassian.net",
+		},
+		{
+			name:   "matches bare host against server with port",
+			data:   "machine jira.example.com login me@sample.org password secret",
+			server: "https://jira.example.com:8443",
+		},
+		{
+			name:   "matches host and port machine",
+			data:   "machine jira.example.com:8443 login me@sample.org password secret",
+			server: "https://jira.example.com:8443",
+		},
+		{
+			name:   "matches full URL machine with port",
+			data:   "machine https://jira.example.com:8443/jira login me@sample.org password secret",
+			server: "https://jira.example.com:8443/jira",
+		},
+		{
+			name: "prefers exact host and port over bare host",
+			data: "machine jira.example.com login me@sample.org password other\n" +
+				"machine jira.example.com:8443 login me@sample.org password secret",
+			server: "https://jira.example.com:8443",
+		},
+		{
+			name:    "does not match a different port",
+			data:    "machine https://jira.example.com:9000 login me@sample.org password secret",
+			server:  "https://jira.example.com:8443",
+			wantErr: ErrNetrcEntryNotFound,
+		},
+		{
 			name:    "does not match a different host",
 			data:    "machine https://other.atlassian.net login me@sample.org password secret",
+			server:  "https://test.atlassian.net",
+			wantErr: ErrNetrcEntryNotFound,
+		},
+		{
+			name:    "does not match a different login",
+			data:    "machine test.atlassian.net login other@sample.org password secret",
 			server:  "https://test.atlassian.net",
 			wantErr: ErrNetrcEntryNotFound,
 		},

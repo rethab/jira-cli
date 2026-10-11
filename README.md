@@ -119,7 +119,9 @@ docker run -it --rm ghcr.io/rethab/jira-cli:1.7.0    # a release
      a `JIRA_API_TOKEN` variable. In addition to this, set `JIRA_AUTH_TYPE` env to `bearer`.
    - Add these ENVs to your shell configuration file, for instance, `$HOME/.bashrc`, so that they are always available.
    - Alternatively, you can also use `.netrc` file or `keychain` to set the token. Learn
-     more [here](https://github.com/ankitpokhrel/jira-cli/discussions/356).
+     more [here](https://github.com/ankitpokhrel/jira-cli/discussions/356). In `.netrc`, use the bare host as the
+     `machine` (for example, `machine jira.example.com`), even if your server URL has a port; a full URL such as
+     `https://jira.example.com:8443` is also accepted.
 2. Run `jira init`, select installation type as `Local`, and provide the required details to generate a config file required
    for the tool.
    - The most common auth type for an on-premises installation is `basic`. If you are using your Jira login credentials
