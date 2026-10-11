@@ -4,52 +4,27 @@
 
 <div>
     <p align="center">
-        <a href="https://github.com/ankitpokhrel/jira-cli/actions?query=workflow%3Abuild+branch%3Amain">
-            <img alt="Build" src="https://img.shields.io/github/actions/workflow/status/ankitpokhrel/jira-cli/ci.yml?branch=main&style=flat-square" />
+        <a href="https://github.com/rethab/jira-cli/actions/workflows/ci.yml?query=branch%3Amain">
+            <img alt="Build" src="https://img.shields.io/github/actions/workflow/status/rethab/jira-cli/ci.yml?branch=main&style=flat-square" />
         </a>
-        <a href="https://github.com/ankitpokhrel/jira-cli/blob/main/LICENSE">
+        <a href="https://github.com/rethab/jira-cli/blob/main/LICENSE">
             <img alt="Software License" src="https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square" />
-        </a>
-        <a href="#">
-            <img alt="Downloads" src="https://img.shields.io/github/downloads/ankitpokhrel/jira-cli/total?style=flat-square" />
-        </a>
-        <a href="https://opencollective.com/jira-cli#backers">
-            <img alt="Financial Contributors" src="https://img.shields.io/opencollective/backers/jira-cli?style=flat-square" />
         </a>
     </p>
     <p align="center">
         <i>Feature-rich Interactive Jira Command Line</i>
     </p>
-    <img align="center" alt="JiraCLI Demo" src=".github/assets/demo.gif" /><br/><br/>
     <p align="center">
-         <sub>
-            Financial support from private and corporate sponsors ensures the tool's continued development.<br/>
-            Please <a href="https://opencollective.com/jira-cli#backers">consider sponsoring the project</a> if you or your company rely on JiraCLI.
-         </sub><br/><br/>
-        <a href="https://opencollective.com/jira-cli#backers" target="_blank">
-            <img src="https://opencollective.com/jira-cli/backers.svg" alt="jira-cli open collective badge">
-        </a>
+        <b>A fork of <a href="https://github.com/ankitpokhrel/jira-cli">ankitpokhrel/jira-cli</a> with <a href="#additional-features">additional features</a> and fixes.</b>
     </p>
-</div>
-
-<div>
-   <h2 align="center">Supporters</h2>
-   <p align="center">
-      <a href="https://www.atlassian.com?from=ankitpokhrel/jira-cli" target="_blank">
-         <img alt="Atlassian Logo" src=".github/assets/supporters/atlassian.png" />
-      </a><br/>
-      <a href="https://www.jetbrains.com/?from=ankitpokhrel/jira-cli" target="_blank">
-         <img alt="JetBrains Logo" src=".github/assets/supporters/jetbrains.png" />
-      </a>
-   </p>
+    <img align="center" alt="JiraCLI Demo" src=".github/assets/demo.gif" /><br/><br/>
 </div>
 
 JiraCLI is an interactive command line tool for Atlassian Jira that will help you avoid using the Jira UI to some extent. This
 tool may not be able to do everything, but it has all the essential features required to improve your day-to-day workflow with Jira.
 
-The tool started with the idea of making issue search and navigation as straightforward as possible. However, with the
-help of [outstanding supporters like you](#support-the-project), we evolved, and the tool now includes all necessary
-features like issue creation, cloning, linking, ticket transition, and much more.
+The tool started with the idea of making issue search and navigation as straightforward as possible, and has since evolved to
+include features like issue creation, cloning, linking, ticket transition, and much more.
 
 > This tool is heavily inspired by the [GitHub CLI](https://github.com/cli/cli)
 
@@ -122,12 +97,6 @@ You can use Docker to quickly try out `jira-cli`. Images are published to `ghcr.
 docker run -it --rm ghcr.io/rethab/jira-cli:latest   # tip of main
 docker run -it --rm ghcr.io/rethab/jira-cli:1.7.0    # a release
 ```
-
-Follow the [installation guide](https://github.com/ankitpokhrel/jira-cli/wiki/Installation) for other installation methods like `Homebrew`, `Nix`, etc.
-
-<a href="https://repology.org/project/jira-cli-go/versions">
-    <img src="https://repology.org/badge/vertical-allrepos/jira-cli-go.svg" alt="Packaging status">
-</a>
 
 ## Getting started
 
@@ -888,20 +857,14 @@ Sprint 1:   3
 1. Not all [Atlassian nodes](https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/#nodes) are
    translated properly at the moment which can cause formatting issues sometimes.
 
-## Feature requests
+## Feature requests and bugs
 
-Please [open a discussion](https://github.com/ankitpokhrel/jira-cli/discussions/categories/ideas) in `ideas` category for the proposed feature.
-
-##### How these requests are usually prioritized?
-
-- The feature that is straightforward to implement, doesn't require too much mental power, and can be done even I am lazy will be picked first.
-- If the feature is something that I am missing in my day-to-day work, it might be done first.
-- Rest of the features will be picked based on the [number of votes](https://github.com/ankitpokhrel/jira-cli/discussions/categories/ideas) on the particular feature.
+Please [open an issue](https://github.com/rethab/jira-cli/issues/new/choose) in this repository.
 
 ## Development
 1. Clone the repo.
    ```sh
-   git clone git@github.com:ankitpokhrel/jira-cli.git
+   git clone git@github.com:rethab/jira-cli.git
    ```
 
 2. Optional: If you want to run a Jira instance locally, you can use the following make recipe.
@@ -919,25 +882,3 @@ Please [open a discussion](https://github.com/ankitpokhrel/jira-cli/discussions/
    ```sh
    make ci
    ```
-
-## Support the project
-Your suggestions and feedbacks are highly appreciated. Please feel free
-to [start a discussion](https://github.com/ankitpokhrel/jira-cli/discussions)
-or [create an issue](https://github.com/ankitpokhrel/jira-cli/issues/new) to share your experience with the tool or to
-discuss a feature/issue.
-
-If you think this tool is useful, saves you a lot of work, and lets you sleep much better, then consider supporting the
-project by any of the following means:
-
-- [Star the repo](https://github.com/ankitpokhrel/jira-cli/stargazers).
-- Spread the word by sharing the project on social media or with friends.
-- [Report bugs](https://github.com/ankitpokhrel/jira-cli/issues/new/choose)
-  or [propose solutions](https://github.com/ankitpokhrel/jira-cli/issues).
-- [Donate a small amount](https://opencollective.com/jira-cli#backers).
-
-<div>
-   <br/>
-   <p align="center">
-      <sub>Made with 💚</sub>
-   </p>
-</div>
