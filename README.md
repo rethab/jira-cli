@@ -57,6 +57,9 @@ Features not available upstream:
   adding `KEY`. ([upstream #747](https://github.com/ankitpokhrel/jira-cli/issues/747))
 - **Readable error on non-JSON responses**: when an SSO redirect, VPN portal, or proxy answers with HTML, the error says
   so instead of `invalid character '<'`. ([upstream #630](https://github.com/ankitpokhrel/jira-cli/issues/630))
+- **Scoped API tokens**: `jira init --installation cloud --scoped-token` looks up your site's cloud ID and configures
+  the Atlassian API gateway as the server, so tokens created with scopes work. Browser links keep using your site
+  URL. See [Cloud server](#cloud-server). ([upstream #850](https://github.com/ankitpokhrel/jira-cli/issues/850))
 - **Verifiable builds**: every release ships SLSA provenance and an SBOM, and every merge to `main` publishes a snapshot
   Homebrew cask and Docker image. See [Installation](#installation).
 
@@ -113,6 +116,36 @@ docker run -it --rm ghcr.io/rethab/jira-cli:1.7.0    # a release
    more [here](https://github.com/ankitpokhrel/jira-cli/discussions/356).
 2. Run `jira init`, select installation type as `Cloud`, and provide required details to generate a config file required
    for the tool.
+
+##### Scoped API tokens
+
+Atlassian also lets you create an [API token with scopes](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/),
+for example a read-only token. Unlike a regular token, a scoped token is rejected by your site URL
+(`https://<site>.atlassian.net`) and only works through the Atlassian API gateway, `https://api.atlassian.com/ex/jira/<cloudId>`.
+
+Pass `--scoped-token` to `jira init` and the cloud ID is looked up for you:
+
+```sh
+jira init --installation cloud --server https://<site>.atlassian.net --login you@example.com --scoped-token
+```
+
+The gateway URL is saved as `server`, and your site URL as `browse_server`, so links printed or opened by the tool
+(e.g. `jira open`) still point to your site. Regular API tokens should not use this flag.
+
+If you keep the token in `~/.netrc`, the entry's `machine` must be `api.atlassian.com`, since that is now the server host.
+
+If you already know your cloud ID, you can skip the lookup and pass the gateway URL as the server instead. In that case,
+also set `browse_server` in the generated config to your site URL to keep browser links working:
+
+```sh
+jira init --installation cloud --server https://api.atlassian.com/ex/jira/<cloudId> --login you@example.com
+```
+
+A scoped token only allows what its scopes cover, so select scopes for the features you use, such as `read:jira-work`,
+`write:jira-work` and `read:jira-user`. Boards and sprints use the Jira Software API, which has its own scopes, such as
+`read:board-scope:jira-software` and `read:sprint:jira-software`. See Atlassian's
+[Jira scopes reference](https://developer.atlassian.com/cloud/jira/platform/scopes-for-oauth-2-3LO-and-forge-apps/) and
+the scopes listed per endpoint in the [Jira Software REST API](https://developer.atlassian.com/cloud/jira/software/rest/intro/).
 
 #### On-premises installation
 

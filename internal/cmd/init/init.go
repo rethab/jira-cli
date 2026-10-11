@@ -24,6 +24,7 @@ type initParams struct {
 	board        string
 	force        bool
 	insecure     bool
+	scopedToken  bool
 }
 
 // NewCmdInit is an init command.
@@ -47,6 +48,8 @@ func NewCmdInit() *cobra.Command {
 	cmd.Flags().Bool("force", false, "Forcefully override existing config if it exists")
 	cmd.Flags().Bool("insecure", false, `If set, the tool will skip TLS certificate verification.
 This can be useful if your server is using self-signed certificates.`)
+	cmd.Flags().Bool("scoped-token", false, `Use this if your API token was created with scopes (cloud only).
+The server is then set to the Atlassian API gateway, as scoped tokens are not accepted by your site URL.`)
 
 	return &cmd
 }
@@ -82,6 +85,9 @@ func parseFlags(flags query.FlagParser) *initParams {
 	insecure, err := flags.GetBool("insecure")
 	cmdutil.ExitIfError(err)
 
+	scopedToken, err := flags.GetBool("scoped-token")
+	cmdutil.ExitIfError(err)
+
 	return &initParams{
 		installation: installation,
 		server:       server,
@@ -91,6 +97,7 @@ func parseFlags(flags query.FlagParser) *initParams {
 		board:        board,
 		force:        force,
 		insecure:     insecure,
+		scopedToken:  scopedToken,
 	}
 }
 
@@ -107,6 +114,7 @@ func initialize(cmd *cobra.Command, _ []string) {
 			Board:        params.board,
 			Force:        params.force,
 			Insecure:     params.insecure,
+			ScopedToken:  params.scopedToken,
 		},
 	)
 
@@ -126,6 +134,9 @@ server's certificate chain and host name in requests to the jira server.`)
 			cmdutil.Failed("Received unexpected response '%s' from jira. Please try again.", e.Status)
 		case errors.Is(err, jiraConfig.ErrSkip):
 			cmdutil.Success("Skipping config generation. Current config: %s", viper.ConfigFileUsed())
+		case errors.Is(err, jiraConfig.ErrScopedTokenLocal):
+			fmt.Println()
+			cmdutil.Failed("%s. Drop --scoped-token or choose the cloud installation.", err.Error())
 		case errors.Is(err, jiraConfig.ErrUnexpectedResponseFormat):
 			fmt.Println()
 			cmdutil.Failed("Got response in unexpected format when fetching metadata. Please try again.")
