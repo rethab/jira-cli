@@ -40,6 +40,9 @@ Features not available upstream:
 
 - **Worklog listing**: `jira issue worklog list ISSUE-1` lists an issue's worklogs, and `jira worklog list` shows what
   a user logged on a given day across all issues. See [Worklog](#worklog).
+- **Release creation**: `jira release create --name v1.0` creates a project version, optionally with a description,
+  dates, and released/archived state. See [Releases](#releases).
+  ([upstream #1002](https://github.com/ankitpokhrel/jira-cli/issues/1002))
 - **Sprints from another board**: `jira sprint list --board 42` lists sprints of a board other than the one configured
   with `jira init`. ([upstream #847](https://github.com/ankitpokhrel/jira-cli/issues/847))
 - **Description-only issue view**: `jira issue view ISSUE-1 --description` prints only the summary and description, without
@@ -744,6 +747,19 @@ $ jira release list
 # List releases for specific project
 $ jira release list --project 1000
 $ jira release list --project KEY
+```
+
+#### Create
+
+```sh
+# Create a release in the default project
+$ jira release create --name "v1.0"
+
+# Create a release with a description and dates (YYYY-MM-DD)
+$ jira release create --name "v2.0" --description "Major release" --start-date 2024-11-01 --release-date 2024-12-31
+
+# Create a release in a specific project, already marked as released
+$ jira release create --project KEY --name "v1.5" --released
 ```
 
 ### Other commands
