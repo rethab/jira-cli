@@ -128,3 +128,30 @@ func TestCreateVersion(t *testing.T) {
 	_, err = client.CreateVersion(&VersionCreateRequest{Name: "v1.0", Project: "TEST"})
 	assertUnexpectedResponse(t, err)
 }
+
+func TestCreateVersionWithProjectID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		assert.NoError(t, err)
+
+		var got map[string]any
+		assert.NoError(t, json.Unmarshal(body, &got))
+		assert.Equal(t, map[string]any{
+			"name":      "v1.0",
+			"projectId": float64(1000),
+			"released":  false,
+			"archived":  false,
+		}, got)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(201)
+		_, _ = w.Write([]byte(`{"id":"10002","name":"v1.0","projectId":1000}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+	actual, err := client.CreateVersion(&VersionCreateRequest{Name: "v1.0", ProjectID: 1000})
+	assert.NoError(t, err)
+	assert.Equal(t, "10002", actual.ID)
+}

@@ -11,7 +11,8 @@ import (
 type VersionCreateRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
-	Project     string `json:"project"`
+	Project     string `json:"project,omitempty"`
+	ProjectID   int64  `json:"projectId,omitempty"`
 	Archived    bool   `json:"archived"`
 	Released    bool   `json:"released"`
 	ReleaseDate string `json:"releaseDate,omitempty"`

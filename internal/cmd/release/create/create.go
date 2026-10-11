@@ -1,6 +1,12 @@
 package create
 
 import (
+	"errors"
+	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -51,41 +57,82 @@ func create(cmd *cobra.Command, _ []string) {
 		cmdutil.Failed("Project is required, use the `--project` flag or run `jira init`")
 	}
 
-	flags := cmd.Flags()
-
-	name, err := flags.GetString("name")
-	cmdutil.ExitIfError(err)
-
-	description, err := flags.GetString("description")
-	cmdutil.ExitIfError(err)
-
-	startDate, err := flags.GetString("start-date")
-	cmdutil.ExitIfError(err)
-
-	releaseDate, err := flags.GetString("release-date")
-	cmdutil.ExitIfError(err)
-
-	released, err := flags.GetBool("released")
-	cmdutil.ExitIfError(err)
-
-	archived, err := flags.GetBool("archived")
+	req, err := newRequest(cmd, project)
 	cmdutil.ExitIfError(err)
 
 	version, err := func() (*jira.ProjectVersion, error) {
 		s := cmdutil.Info("Creating version...")
 		defer s.Stop()
 
-		return api.DefaultClient(debug).CreateVersion(&jira.VersionCreateRequest{
-			Name:        name,
-			Description: description,
-			Project:     project,
-			StartDate:   startDate,
-			ReleaseDate: releaseDate,
-			Released:    released,
-			Archived:    archived,
-		})
+		return api.DefaultClient(debug).CreateVersion(req)
 	}()
 	cmdutil.ExitIfError(err)
 
 	cmdutil.Success("Version created: %s (ID: %s)", version.Name, version.ID)
+}
+
+func newRequest(cmd *cobra.Command, project string) (*jira.VersionCreateRequest, error) {
+	flags := cmd.Flags()
+
+	name, err := flags.GetString("name")
+	if err != nil {
+		return nil, err
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, errors.New("version name must not be empty")
+	}
+
+	description, err := flags.GetString("description")
+	if err != nil {
+		return nil, err
+	}
+
+	startDate, err := dateFlag(cmd, "start-date")
+	if err != nil {
+		return nil, err
+	}
+
+	releaseDate, err := dateFlag(cmd, "release-date")
+	if err != nil {
+		return nil, err
+	}
+
+	released, err := flags.GetBool("released")
+	if err != nil {
+		return nil, err
+	}
+
+	archived, err := flags.GetBool("archived")
+	if err != nil {
+		return nil, err
+	}
+
+	req := jira.VersionCreateRequest{
+		Name:        name,
+		Description: description,
+		StartDate:   startDate,
+		ReleaseDate: releaseDate,
+		Released:    released,
+		Archived:    archived,
+	}
+	// The "project" field only accepts a key; numeric IDs (allowed by `release list`) must go in projectId.
+	if id, err := strconv.ParseInt(project, 10, 64); err == nil {
+		req.ProjectID = id
+	} else {
+		req.Project = project
+	}
+
+	return &req, nil
+}
+
+func dateFlag(cmd *cobra.Command, flag string) (string, error) {
+	value, err := cmd.Flags().GetString(flag)
+	if err != nil || value == "" {
+		return value, err
+	}
+	if _, err := time.Parse(cmdutil.DateLayout, value); err != nil {
+		return "", fmt.Errorf("invalid --%s %q: expected format YYYY-MM-DD", flag, value)
+	}
+	return value, nil
 }
