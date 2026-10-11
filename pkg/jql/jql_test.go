@@ -397,6 +397,34 @@ func TestHasProject(t *testing.T) {
 			expected: false,
 		},
 		{
+			input:    "\"project\" = TEST",
+			expected: true,
+		},
+		{
+			input:    "'Project' IN (TEST)",
+			expected: true,
+		},
+		{
+			input:    "summary ~ \"project\"",
+			expected: false,
+		},
+		{
+			input:    "project IN(TEST, TEST1)",
+			expected: true,
+		},
+		{
+			input:    "project NOT IN (TEST)",
+			expected: true,
+		},
+		{
+			input:    "projectis EMPTY",
+			expected: false,
+		},
+		{
+			input:    "status = Done ORDER BY project ASC",
+			expected: false,
+		},
+		{
 			input:    "projectType",
 			expected: false,
 		},
