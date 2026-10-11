@@ -105,7 +105,9 @@ docker run -it --rm ghcr.io/rethab/jira-cli:1.7.0    # a release
 1. [Get a Jira API token](https://id.atlassian.com/manage-profile/security/api-tokens) and export it to your shell as
    a `JIRA_API_TOKEN` variable. Add it to your shell configuration file, for instance, `$HOME/.bashrc`, so that the
    variable is always available. Alternatively, you can also use `.netrc` file or `keychain` to set the token. Learn
-   more [here](https://github.com/ankitpokhrel/jira-cli/discussions/356).
+   more [here](https://github.com/ankitpokhrel/jira-cli/discussions/356). In `.netrc`, use the bare host as the
+   `machine` (for example, `machine your-site.atlassian.net`); a full URL such as `https://your-site.atlassian.net`
+   is also accepted.
 2. Run `jira init`, select installation type as `Cloud`, and provide required details to generate a config file required
    for the tool.
 
