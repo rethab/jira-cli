@@ -1,6 +1,7 @@
 package netrc
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -43,7 +44,7 @@ func TestRead(t *testing.T) {
 			netrc = parseNetrc(tt.data)
 
 			got, err := Read(tt.server, "me@sample.org")
-			if err != tt.wantErr {
+			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("Read() error = %v, want %v", err, tt.wantErr)
 			}
 			if tt.wantErr == nil && got.Password != "secret" {
