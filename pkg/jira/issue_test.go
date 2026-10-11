@@ -787,7 +787,7 @@ func TestDeleteRemoteLink(t *testing.T) {
 	assertUnexpectedResponse(t, err)
 }
 
-func TestGetRemoteLinkID(t *testing.T) {
+func TestGetRemoteLinkIDs(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/rest/api/2/issue/TEST-1/remotelink", r.URL.Path)
 
@@ -795,18 +795,24 @@ func TestGetRemoteLinkID(t *testing.T) {
 		w.WriteHeader(200)
 		_, _ = w.Write([]byte(`[
 			{"id": 10000, "object": {"url": "https://example.com", "title": "Example"}},
-			{"id": 10001, "object": {"url": "https://other.com", "title": "Other"}}
+			{"id": 10001, "object": {"url": "https://other.com", "title": "Other"}},
+			{"id": 10002, "object": {"url": "https://example.com", "title": "Example again"}},
+			{"id": 10003, "object": {"url": "https://example.com/", "title": "Trailing slash"}}
 		]`))
 	}))
 	defer server.Close()
 
 	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
 
-	id, err := client.GetRemoteLinkID("TEST-1", "https://other.com")
+	ids, err := client.GetRemoteLinkIDs("TEST-1", "https://other.com")
 	assert.NoError(t, err)
-	assert.Equal(t, 10001, id)
+	assert.Equal(t, []int{10001}, ids)
 
-	_, err = client.GetRemoteLinkID("TEST-1", "https://missing.com")
+	ids, err = client.GetRemoteLinkIDs("TEST-1", "https://example.com")
+	assert.NoError(t, err)
+	assert.Equal(t, []int{10000, 10002}, ids)
+
+	_, err = client.GetRemoteLinkIDs("TEST-1", "https://missing.com")
 	assert.ErrorIs(t, err, ErrNoRemoteLink)
 }
 

@@ -490,7 +490,8 @@ $ jira issue unlink ISSUE-1 ISSUE-2
 ```
 
 ##### Remote
-The `remote` command lets you remove a remote web link from an issue. The link is identified by its URL.
+The `remote` command lets you remove a remote web link from an issue. The link is identified by its URL, which must
+match exactly. If the issue has several remote links with that URL, all of them are removed.
 
 ```sh
 # Removes a remote web link using an interactive prompt

@@ -422,19 +422,13 @@ func ifaceToADF(v any) *adf.ADF {
 }
 
 type remotelinkRequest struct {
-	RemoteObject struct {
-		URL   string `json:"url"`
-		Title string `json:"title"`
-	} `json:"object"`
+	RemoteObject RemoteLinkObject `json:"object"`
 }
 
 // RemoteLinkIssue adds a remote link to an issue using POST /issue/{issueId}/remotelink endpoint.
 func (c *Client) RemoteLinkIssue(issueID, title, url string) error {
 	body, err := json.Marshal(remotelinkRequest{
-		RemoteObject: struct {
-			URL   string `json:"url"`
-			Title string `json:"title"`
-		}{Title: title, URL: url},
+		RemoteObject: RemoteLinkObject{Title: title, URL: url},
 	})
 	if err != nil {
 		return err
@@ -501,19 +495,24 @@ func (c *Client) GetRemoteLinks(key string) ([]*RemoteLink, error) {
 	return links, nil
 }
 
-// GetRemoteLinkID gets the ID of the remote link of an issue that points to the given URL.
-func (c *Client) GetRemoteLinkID(key, url string) (int, error) {
+// GetRemoteLinkIDs gets the IDs of all remote links of an issue that point to the given URL.
+// Jira allows the same URL to be linked more than once, so there can be several.
+func (c *Client) GetRemoteLinkIDs(key, url string) ([]int, error) {
 	links, err := c.GetRemoteLinks(key)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
+	var ids []int
 	for _, l := range links {
 		if l.Object.URL == url {
-			return l.ID, nil
+			ids = append(ids, l.ID)
 		}
 	}
-	return 0, ErrNoRemoteLink
+	if len(ids) == 0 {
+		return nil, ErrNoRemoteLink
+	}
+	return ids, nil
 }
 
 // DeleteRemoteLink removes a remote link from an issue using DELETE /issue/{key}/remotelink/{linkId} endpoint.

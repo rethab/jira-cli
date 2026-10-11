@@ -3,6 +3,7 @@ package remote
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
@@ -14,7 +15,8 @@ import (
 )
 
 const (
-	helpText = `Removes a remote web link from an issue. The link to remove is identified by its URL.`
+	helpText = `Removes a remote web link from an issue. The link to remove is identified by its URL, which must match
+exactly. If the issue has several remote links with that URL, all of them are removed.`
 	examples = `$ jira issue unlink remote ISSUE-1 http://weblink.com`
 )
 
@@ -48,11 +50,12 @@ func remoteunlink(cmd *cobra.Command, args []string) {
 	cmdutil.ExitIfError(uc.setIssueKey(project))
 	cmdutil.ExitIfError(uc.setRemoteLinkURL())
 
+	var removed int
 	err := func() error {
 		s := cmdutil.Info("Removing remote web link from issue")
 		defer s.Stop()
 
-		linkID, err := client.GetRemoteLinkID(uc.params.issueKey, uc.params.url)
+		linkIDs, err := client.GetRemoteLinkIDs(uc.params.issueKey, uc.params.url)
 		if err != nil {
 			if errors.Is(err, jira.ErrNoRemoteLink) {
 				return fmt.Errorf("issue %s has no remote link with URL %q", uc.params.issueKey, uc.params.url)
@@ -60,13 +63,23 @@ func remoteunlink(cmd *cobra.Command, args []string) {
 			return err
 		}
 
-		return client.DeleteRemoteLink(uc.params.issueKey, linkID)
+		for _, id := range linkIDs {
+			if err := client.DeleteRemoteLink(uc.params.issueKey, id); err != nil {
+				return err
+			}
+			removed++
+		}
+		return nil
 	}()
 	cmdutil.ExitIfError(err)
 
 	server := viper.GetString("server")
 
-	cmdutil.Success("Remote web link removed from Issue %s", uc.params.issueKey)
+	if removed > 1 {
+		cmdutil.Success("%d remote web links removed from Issue %s", removed, uc.params.issueKey)
+	} else {
+		cmdutil.Success("Remote web link removed from Issue %s", uc.params.issueKey)
+	}
 	fmt.Printf("%s\n", cmdutil.GenerateServerBrowseURL(server, uc.params.issueKey))
 
 	if web, _ := cmd.Flags().GetBool("web"); web {
@@ -89,7 +102,7 @@ func parseArgsAndFlags(args []string, project string) *unlinkParams {
 		issueKey = cmdutil.GetJiraIssueKey(project, args[0])
 	}
 	if nargs >= 2 {
-		url = args[1]
+		url = strings.TrimSpace(args[1])
 	}
 
 	debug := viper.GetBool("debug")
@@ -141,7 +154,7 @@ func (uc *unlinkCmd) setRemoteLinkURL() error {
 	if err := survey.Ask([]*survey.Question{qs}, &ans); err != nil {
 		return err
 	}
-	uc.params.url = ans
+	uc.params.url = strings.TrimSpace(ans)
 
 	return nil
 }
