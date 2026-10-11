@@ -7,6 +7,7 @@ package netrc
 import (
 	"fmt"
 	"net/url"
+	"strings"
 )
 
 // ErrNetrcEntryNotFound is thrown if details for the machine is not found.
@@ -31,15 +32,33 @@ func Read(machine string, login string) (*Entry, error) {
 		return nil, err
 	}
 
-	for _, line := range netrc {
-		if line.machine == serverURL.Host && line.login == login {
-			return &Entry{
-				Machine:  line.machine,
-				Login:    line.login,
-				Password: line.password,
-			}, nil
+	// The netrc spec has no ports, so a bare host must also match a server URL
+	// that carries one. An entry naming the exact host:port still wins, so
+	// adding the fallback never changes which entry an existing setup resolves to.
+	for _, host := range []string{serverURL.Host, serverURL.Hostname()} {
+		for _, line := range netrc {
+			if strings.EqualFold(machineHost(line.machine), host) && line.login == login {
+				return &Entry{
+					Machine:  line.machine,
+					Login:    line.login,
+					Password: line.password,
+				}, nil
+			}
 		}
 	}
 
 	return nil, ErrNetrcEntryNotFound
+}
+
+// machineHost returns the host of a netrc machine field. The spec calls for a
+// bare host, but users commonly write the full server URL.
+func machineHost(machine string) string {
+	if !strings.Contains(machine, "://") {
+		return machine
+	}
+	u, err := url.Parse(machine)
+	if err != nil || u.Host == "" {
+		return machine
+	}
+	return u.Host
 }
