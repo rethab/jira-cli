@@ -367,8 +367,7 @@ func constructCustomFieldsForEdit(fields map[string]string, configuredFields []I
 
 	for key, val := range fields {
 		for _, configured := range configuredFields {
-			identifier := strings.ReplaceAll(strings.ToLower(strings.TrimSpace(configured.Name)), " ", "-")
-			if identifier != strings.ToLower(key) {
+			if !CustomFieldMatches(key, configured) {
 				continue
 			}
 

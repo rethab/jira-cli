@@ -248,6 +248,13 @@ func assigneeField(assignee, installationType string) any {
 	}{AccountID: id}
 }
 
+// CustomFieldMatches reports whether a key passed on the command line refers to the configured field.
+// Create, edit, and validation must all go through this so they agree on which keys are applied.
+func CustomFieldMatches(key string, configured IssueTypeField) bool {
+	identifier := strings.ReplaceAll(strings.ToLower(strings.TrimSpace(configured.Name)), " ", "-")
+	return identifier == strings.ToLower(key)
+}
+
 func constructCustomFields(fields map[string]string, configuredFields []IssueTypeField, data *createRequest) {
 	if len(fields) == 0 || len(configuredFields) == 0 {
 		return
@@ -257,8 +264,7 @@ func constructCustomFields(fields map[string]string, configuredFields []IssueTyp
 
 	for key, val := range fields {
 		for _, configured := range configuredFields {
-			identifier := strings.ReplaceAll(strings.ToLower(strings.TrimSpace(configured.Name)), " ", "-")
-			if identifier != strings.ToLower(key) {
+			if !CustomFieldMatches(key, configured) {
 				continue
 			}
 
