@@ -80,7 +80,9 @@ func ToJiraMD(md string) string {
 		out = strings.ReplaceAll(out, placeholder(nonce, i), mention)
 	}
 
-	return out
+	// The renderer ends every block with blank lines, which Jira would store
+	// verbatim at the end of each description, comment and worklog.
+	return strings.TrimRight(out, "\n")
 }
 
 // placeholderNonce returns a random token used to make mention placeholders

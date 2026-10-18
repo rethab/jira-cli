@@ -19,7 +19,7 @@ func TestBuildEditRequestConvertsMarkdownBody(t *testing.T) {
 		{
 			name:     "markdown body is converted to wiki markup",
 			body:     "# Heading\n\nSome **bold** text",
-			wantBody: "h1. Heading\nSome *bold* text\n\n",
+			wantBody: "h1. Heading\nSome *bold* text",
 		},
 		{
 			name:     "empty body is left untouched",
@@ -98,7 +98,7 @@ func TestServerInteractiveEditRoundTrip(t *testing.T) {
 
 	assert.Equal(
 		t,
-		"h2. Updated heading\n* first ordered item\n* second ordered item\nSome *bold wiki* text\n\n",
+		"h2. Updated heading\n* first ordered item\n* second ordered item\nSome *bold wiki* text",
 		edr.Body,
 	)
 	assert.NotContains(t, edr.Body, "h1.", "wiki ordered list items must not become headings")

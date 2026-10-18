@@ -45,7 +45,7 @@ func (c *createTestServer) statusCode(code int) {
 
 func TestCreate(t *testing.T) {
 	expectedBody := `{"update":{},"fields":{"project":{"key":"TEST"},"issuetype":{"name":"Bug"},` +
-		`"summary":"Test bug","description":"Test description\n\n","priority":{"name":"Normal"},"labels":["test","dev"],` +
+		`"summary":"Test bug","description":"Test description","priority":{"name":"Normal"},"labels":["test","dev"],` +
 		`"components":[{"name":"BE"},{"name":"FE"}],"fixVersions":[{"name":"v2.0"},{"name":"v2.1-hotfix"}],"versions":[{"name":"v3.0"},{"name":"v3.1-hotfix"}],` +
 		`"timetracking":{"originalEstimate":"2d"}}}`
 	testServer := createTestServer{code: 201}
@@ -151,7 +151,7 @@ func TestCreateAssignee(t *testing.T) {
 
 func TestCreateSubtask(t *testing.T) {
 	expectedBody := `{"update":{},"fields":{"project":{"key":"TEST"},"issuetype":{"name":"Sub-task"},` +
-		`"parent":{"key":"TEST-123"},"summary":"Test sub-task","description":"Test description\n\n"}}`
+		`"parent":{"key":"TEST-123"},"summary":"Test sub-task","description":"Test description"}}`
 	testServer := createTestServer{code: 201}
 	server := testServer.serve(t, expectedBody)
 	defer server.Close()
@@ -182,7 +182,7 @@ func TestCreateSubtask(t *testing.T) {
 }
 
 func TestCreateEpic(t *testing.T) {
-	expectedBody := `{"update":{},"fields":{"customfield_10001":"CLI","description":"Test description\n\n","issuetype":{"name":` +
+	expectedBody := `{"update":{},"fields":{"customfield_10001":"CLI","description":"Test description","issuetype":{"name":` +
 		`"Bug"},"priority":{"name":"Normal"},"project":{"key":"TEST"},"summary":"Test bug"}}`
 	testServer := createTestServer{code: 201}
 	server := testServer.serve(t, expectedBody)
@@ -214,7 +214,7 @@ func TestCreateEpic(t *testing.T) {
 }
 
 func TestCreateEpicNextGen(t *testing.T) {
-	expectedBody := `{"update":{},"fields":{"description":"Test description\n\n","issuetype":{"name":"Bug"},` +
+	expectedBody := `{"update":{},"fields":{"description":"Test description","issuetype":{"name":"Bug"},` +
 		`"parent":{"key":"TEST-123"},"project":{"key":"TEST"},"summary":"Test bug"}}`
 	testServer := createTestServer{code: 201}
 	server := testServer.serve(t, expectedBody)

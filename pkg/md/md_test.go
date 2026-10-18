@@ -17,22 +17,22 @@ func TestToJiraMDKeepsBlockSeparationAfterImage(t *testing.T) {
 		{
 			name:     "image alone",
 			input:    "![](i.png)\n",
-			expected: "!i.png!\n\n",
+			expected: "!i.png!",
 		},
 		{
 			name:     "image followed by paragraph and table",
 			input:    "![](i.png)\n\nsome text\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n",
-			expected: "!i.png!\n\nsome text\n\n||a||b||\n|1|2|\n\n",
+			expected: "!i.png!\n\nsome text\n\n||a||b||\n|1|2|",
 		},
 		{
 			name:     "image followed by paragraph and list",
 			input:    "![](i.png)\n\nsome text\n\n* a\n* b\n",
-			expected: "!i.png!\n\nsome text\n\n* a\n* b\n\n",
+			expected: "!i.png!\n\nsome text\n\n* a\n* b",
 		},
 		{
 			name:     "image with alt text followed by table",
 			input:    "![description](i.png)\n\n| a |\n| --- |\n| 1 |\n",
-			expected: "!i.png!\n\n||a||\n|1|\n\n",
+			expected: "!i.png!\n\n||a||\n|1|",
 		},
 	}
 
@@ -45,7 +45,8 @@ func TestToJiraMDKeepsBlockSeparationAfterImage(t *testing.T) {
 
 // Plain text doesn't count as output for the renderer's block separation, so
 // a heading or list after nothing but plain paragraphs must still start on its
-// own line. Otherwise Jira renders the list as part of the heading.
+// own line. Otherwise it is glued onto the preceding paragraph line and Jira
+// renders it as literal text.
 func TestToJiraMDKeepsBlockSeparationAfterPlainText(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -55,32 +56,32 @@ func TestToJiraMDKeepsBlockSeparationAfterPlainText(t *testing.T) {
 		{
 			name:     "paragraph followed by list",
 			input:    "some text\n\n* a\n* b\n",
-			expected: "some text\n\n* a\n* b\n\n",
+			expected: "some text\n\n* a\n* b",
 		},
 		{
 			name:     "paragraph followed by heading",
 			input:    "some text\n\n### Title\n\nmore text\n",
-			expected: "some text\n\nh3. Title\nmore text\n\n",
+			expected: "some text\n\nh3. Title\nmore text",
 		},
 		{
 			name:     "paragraphs followed by heading and list",
 			input:    "some text\n\nmore text\n\n### Title\n\n- a\n- b\n",
-			expected: "some text\n\nmore text\n\nh3. Title\n* a\n* b\n\n",
+			expected: "some text\n\nmore text\n\nh3. Title\n* a\n* b",
 		},
 		{
 			name:     "paragraph followed by table",
 			input:    "some text\n\n| a |\n| --- |\n| 1 |\n",
-			expected: "some text\n\n||a||\n|1|\n\n",
+			expected: "some text\n\n||a||\n|1|",
 		},
 		{
 			name:     "paragraph followed by code block",
 			input:    "some text\n\n```\ncode\n```\n",
-			expected: "some text\n\n{code}\ncode\n{code}\n\n",
+			expected: "some text\n\n{code}\ncode\n{code}",
 		},
 		{
 			name:     "paragraph followed by horizontal rule",
 			input:    "some text\n\n---\n\nmore text\n",
-			expected: "some text\n\n\n----\nmore text\n\n",
+			expected: "some text\n\n\n----\nmore text",
 		},
 	}
 
@@ -190,7 +191,7 @@ import "fmt"
 
 func main\(\) {
     fmt.Println\("hello world"\)
-}` + "```\n\n"
+}` + "```"
 
 	assert.Equal(t, expected, ToJiraMD(jfm))
 }
@@ -204,47 +205,47 @@ func TestToJiraMDPreservesMentions(t *testing.T) {
 		{
 			name:     "plain mention",
 			input:    `[~ankit]`,
-			expected: "[~ankit]\n\n",
+			expected: "[~ankit]",
 		},
 		{
 			name:     "mention with display name containing spaces",
 			input:    `[~display name with spaces]`,
-			expected: "[~display name with spaces]\n\n",
+			expected: "[~display name with spaces]",
 		},
 		{
 			name:     "mention inline in text",
 			input:    `Hey [~ankit], can you take a look?`,
-			expected: "Hey [~ankit], can you take a look?\n\n",
+			expected: "Hey [~ankit], can you take a look?",
 		},
 		{
 			name:     "mention inside a list item",
 			input:    "- [~ankit] please review\n- [~jane doe] please approve",
-			expected: "* [~ankit] please review\n* [~jane doe] please approve\n\n",
+			expected: "* [~ankit] please review\n* [~jane doe] please approve",
 		},
 		{
 			name:     "multiple mentions",
 			input:    `cc [~ankit] and [~jane]`,
-			expected: "cc [~ankit] and [~jane]\n\n",
+			expected: "cc [~ankit] and [~jane]",
 		},
 		{
 			name:     "more than ten mentions",
 			input:    "[~user0] [~user1] [~user2] [~user3] [~user4] [~user5] [~user6] [~user7] [~user8] [~user9] [~user10] [~user11]",
-			expected: "[~user0] [~user1] [~user2] [~user3] [~user4] [~user5] [~user6] [~user7] [~user8] [~user9] [~user10] [~user11]\n\n",
+			expected: "[~user0] [~user1] [~user2] [~user3] [~user4] [~user5] [~user6] [~user7] [~user8] [~user9] [~user10] [~user11]",
 		},
 		{
 			name:     "mention in inline code",
 			input:    "Use `[~ankit]` here",
-			expected: "Use {{[~ankit]}} here\n\n",
+			expected: "Use {{[~ankit]}} here",
 		},
 		{
 			name:     "mention in code fence",
 			input:    "```\n[~ankit]\n```",
-			expected: "{code}\n[~ankit]\n{code}\n\n",
+			expected: "{code}\n[~ankit]\n{code}",
 		},
 		{
 			name:     "non-mention brackets stay escaped",
 			input:    `a [not a mention] b`,
-			expected: "a \\[not a mention\\] b\n\n",
+			expected: "a \\[not a mention\\] b",
 		},
 	}
 
