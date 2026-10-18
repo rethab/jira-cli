@@ -141,12 +141,7 @@ homebrew_casks:
     directory: Casks
 
 changelog:
-  disable: true
-  use: github
-  sort: desc
-  filters:
-    exclude:
-      - '^doc:'
-      - '^dev:'
-      - '^build:'
-      - '^ci:'
+  # Every change lands as a squash-merged PR, so GitHub's generated notes (one
+  # line per PR) are the changelog. GoReleaser hands GitHub the previous v* tag;
+  # left to pick one itself, GitHub diffs against the latest snapshot-* tag.
+  use: github-native
