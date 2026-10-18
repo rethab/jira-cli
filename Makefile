@@ -1,4 +1,4 @@
-.PHONY: all deps build install ldflags lint golangci-lint-install golangci-lint-version test ci jira.server clean distclean
+.PHONY: all build install ldflags lint golangci-lint-install golangci-lint-version test ci jira.server clean distclean
 
 ################
 # Tool version #
@@ -43,10 +43,7 @@ export GOCACHE ?= $(CURDIR)/.gocache
 
 all: build
 
-deps:
-	go mod vendor -v
-
-build: deps
+build:
 	go build -ldflags='$(LDFLAGS)' ./...
 
 install:
@@ -87,7 +84,10 @@ ci: lint test
 jira.server:
 	docker compose up -d
 
+# Removes a vendor/ left over from the old `make deps`: Go builds from it
+# whenever it exists, and a stale one fails with "inconsistent vendoring".
 clean:
+	rm -rf vendor
 	go clean -x ./...
 
 distclean:

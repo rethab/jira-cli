@@ -36,7 +36,6 @@ RUN set -eux; \
     export GOOS="$TARGETOS" GOARCH="$TARGETARCH"; \
     if [ -n "$TARGETVARIANT" ]; then export GOARM="${TARGETVARIANT#v}"; fi; \
     if [ -z "$VERSION" ]; then unset VERSION; else export VERSION="${VERSION#v}"; fi; \
-    make deps; \
     go build -trimpath -ldflags="$(make -s ldflags)" -o /out/jira ./cmd/jira
 
 # Kept free of RUN instructions: they would execute on the target platform
