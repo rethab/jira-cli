@@ -43,6 +43,54 @@ func TestToJiraMDKeepsBlockSeparationAfterImage(t *testing.T) {
 	}
 }
 
+// Plain text doesn't count as output for the renderer's block separation, so
+// a heading or list after nothing but plain paragraphs must still start on its
+// own line. Otherwise Jira renders the list as part of the heading.
+func TestToJiraMDKeepsBlockSeparationAfterPlainText(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "paragraph followed by list",
+			input:    "some text\n\n* a\n* b\n",
+			expected: "some text\n\n* a\n* b\n\n",
+		},
+		{
+			name:     "paragraph followed by heading",
+			input:    "some text\n\n### Title\n\nmore text\n",
+			expected: "some text\n\nh3. Title\nmore text\n\n",
+		},
+		{
+			name:     "paragraphs followed by heading and list",
+			input:    "some text\n\nmore text\n\n### Title\n\n- a\n- b\n",
+			expected: "some text\n\nmore text\n\nh3. Title\n* a\n* b\n\n",
+		},
+		{
+			name:     "paragraph followed by table",
+			input:    "some text\n\n| a |\n| --- |\n| 1 |\n",
+			expected: "some text\n\n||a||\n|1|\n\n",
+		},
+		{
+			name:     "paragraph followed by code block",
+			input:    "some text\n\n```\ncode\n```\n",
+			expected: "some text\n\n{code}\ncode\n{code}\n\n",
+		},
+		{
+			name:     "paragraph followed by horizontal rule",
+			input:    "some text\n\n---\n\nmore text\n",
+			expected: "some text\n\n\n----\nmore text\n\n",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, ToJiraMD(tc.input))
+		})
+	}
+}
+
 func TestToJiraMD(t *testing.T) {
 	jfm := `# H1
 Some _Markdown_ text.
@@ -156,17 +204,17 @@ func TestToJiraMDPreservesMentions(t *testing.T) {
 		{
 			name:     "plain mention",
 			input:    `[~ankit]`,
-			expected: "[~ankit]",
+			expected: "[~ankit]\n\n",
 		},
 		{
 			name:     "mention with display name containing spaces",
 			input:    `[~display name with spaces]`,
-			expected: "[~display name with spaces]",
+			expected: "[~display name with spaces]\n\n",
 		},
 		{
 			name:     "mention inline in text",
 			input:    `Hey [~ankit], can you take a look?`,
-			expected: "Hey [~ankit], can you take a look?",
+			expected: "Hey [~ankit], can you take a look?\n\n",
 		},
 		{
 			name:     "mention inside a list item",
@@ -176,12 +224,12 @@ func TestToJiraMDPreservesMentions(t *testing.T) {
 		{
 			name:     "multiple mentions",
 			input:    `cc [~ankit] and [~jane]`,
-			expected: "cc [~ankit] and [~jane]",
+			expected: "cc [~ankit] and [~jane]\n\n",
 		},
 		{
 			name:     "more than ten mentions",
 			input:    "[~user0] [~user1] [~user2] [~user3] [~user4] [~user5] [~user6] [~user7] [~user8] [~user9] [~user10] [~user11]",
-			expected: "[~user0] [~user1] [~user2] [~user3] [~user4] [~user5] [~user6] [~user7] [~user8] [~user9] [~user10] [~user11]",
+			expected: "[~user0] [~user1] [~user2] [~user3] [~user4] [~user5] [~user6] [~user7] [~user8] [~user9] [~user10] [~user11]\n\n",
 		},
 		{
 			name:     "mention in inline code",
@@ -196,7 +244,7 @@ func TestToJiraMDPreservesMentions(t *testing.T) {
 		{
 			name:     "non-mention brackets stay escaped",
 			input:    `a [not a mention] b`,
-			expected: `a \[not a mention\] b`,
+			expected: "a \\[not a mention\\] b\n\n",
 		},
 	}
 

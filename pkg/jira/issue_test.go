@@ -548,7 +548,7 @@ func TestAddIssueComment(t *testing.T) {
 		actualBody := new(strings.Builder)
 		_, _ = io.Copy(actualBody, r.Body)
 
-		expectedBody := `{"body":"comment","properties":[{"key":"sd.public.comment","value":{"internal":false}}]}`
+		expectedBody := `{"body":"comment\n\n","properties":[{"key":"sd.public.comment","value":{"internal":false}}]}`
 
 		assert.Equal(t, expectedBody, actualBody.String())
 
@@ -588,9 +588,9 @@ func TestAddIssueWorklog(t *testing.T) {
 		_, _ = io.Copy(actualBody, r.Body)
 
 		if strings.Contains(actualBody.String(), "started") {
-			expectedBody = `{"started":"2022-01-01T01:02:02.000+0200","timeSpent":"1h","comment":"comment"}`
+			expectedBody = `{"started":"2022-01-01T01:02:02.000+0200","timeSpent":"1h","comment":"comment\n\n"}`
 		} else {
-			expectedBody = `{"timeSpent":"1h","comment":"comment"}`
+			expectedBody = `{"timeSpent":"1h","comment":"comment\n\n"}`
 		}
 
 		assert.Equal(t, expectedBody, actualBody.String())

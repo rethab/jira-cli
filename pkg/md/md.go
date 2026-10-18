@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"regexp"
 	"strings"
 
@@ -41,6 +42,13 @@ func ToJiraMD(md string) string {
 	renderer := &cf.Renderer{Flags: cf.IgnoreMacroEscaping}
 	r := bf.New(bf.WithRenderer(renderer), bf.WithExtensions(bf.CommonExtensions))
 
+	// The renderer only ends a block with a newline if it has recorded
+	// earlier output, but it writes text without recording it. After nothing
+	// but plain text it therefore drops the newline, gluing the next heading,
+	// list or table onto the paragraph. Rendering this emphasis marker into
+	// io.Discard after each text node records output without writing any.
+	outputMarker := bf.NewNode(bf.Emph)
+
 	var buf bytes.Buffer
 	ast := r.Parse([]byte(protected))
 	ast.Walk(func(node *bf.Node, entering bool) bf.WalkStatus {
@@ -60,7 +68,11 @@ func ToJiraMD(md string) string {
 			}
 			return bf.SkipChildren
 		}
-		return renderer.RenderNode(&buf, node, entering)
+		status := renderer.RenderNode(&buf, node, entering)
+		if node.Type == bf.Text && len(node.Literal) > 0 {
+			renderer.RenderNode(io.Discard, outputMarker, true)
+		}
+		return status
 	})
 
 	out := buf.String()
