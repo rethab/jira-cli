@@ -17,22 +17,71 @@ func TestToJiraMDKeepsBlockSeparationAfterImage(t *testing.T) {
 		{
 			name:     "image alone",
 			input:    "![](i.png)\n",
-			expected: "!i.png!\n\n",
+			expected: "!i.png!",
 		},
 		{
 			name:     "image followed by paragraph and table",
 			input:    "![](i.png)\n\nsome text\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n",
-			expected: "!i.png!\n\nsome text\n\n||a||b||\n|1|2|\n\n",
+			expected: "!i.png!\n\nsome text\n\n||a||b||\n|1|2|",
 		},
 		{
 			name:     "image followed by paragraph and list",
 			input:    "![](i.png)\n\nsome text\n\n* a\n* b\n",
-			expected: "!i.png!\n\nsome text\n\n* a\n* b\n\n",
+			expected: "!i.png!\n\nsome text\n\n* a\n* b",
 		},
 		{
 			name:     "image with alt text followed by table",
 			input:    "![description](i.png)\n\n| a |\n| --- |\n| 1 |\n",
-			expected: "!i.png!\n\n||a||\n|1|\n\n",
+			expected: "!i.png!\n\n||a||\n|1|",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, ToJiraMD(tc.input))
+		})
+	}
+}
+
+// Plain text doesn't count as output for the renderer's block separation, so
+// a heading or list after nothing but plain paragraphs must still start on its
+// own line. Otherwise it is glued onto the preceding paragraph line and Jira
+// renders it as literal text.
+func TestToJiraMDKeepsBlockSeparationAfterPlainText(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "paragraph followed by list",
+			input:    "some text\n\n* a\n* b\n",
+			expected: "some text\n\n* a\n* b",
+		},
+		{
+			name:     "paragraph followed by heading",
+			input:    "some text\n\n### Title\n\nmore text\n",
+			expected: "some text\n\nh3. Title\nmore text",
+		},
+		{
+			name:     "paragraphs followed by heading and list",
+			input:    "some text\n\nmore text\n\n### Title\n\n- a\n- b\n",
+			expected: "some text\n\nmore text\n\nh3. Title\n* a\n* b",
+		},
+		{
+			name:     "paragraph followed by table",
+			input:    "some text\n\n| a |\n| --- |\n| 1 |\n",
+			expected: "some text\n\n||a||\n|1|",
+		},
+		{
+			name:     "paragraph followed by code block",
+			input:    "some text\n\n```\ncode\n```\n",
+			expected: "some text\n\n{code}\ncode\n{code}",
+		},
+		{
+			name:     "paragraph followed by horizontal rule",
+			input:    "some text\n\n---\n\nmore text\n",
+			expected: "some text\n\n\n----\nmore text",
 		},
 	}
 
@@ -142,7 +191,7 @@ import "fmt"
 
 func main\(\) {
     fmt.Println\("hello world"\)
-}` + "```\n\n"
+}` + "```"
 
 	assert.Equal(t, expected, ToJiraMD(jfm))
 }
@@ -171,7 +220,7 @@ func TestToJiraMDPreservesMentions(t *testing.T) {
 		{
 			name:     "mention inside a list item",
 			input:    "- [~ankit] please review\n- [~jane doe] please approve",
-			expected: "* [~ankit] please review\n* [~jane doe] please approve\n\n",
+			expected: "* [~ankit] please review\n* [~jane doe] please approve",
 		},
 		{
 			name:     "multiple mentions",
@@ -186,17 +235,17 @@ func TestToJiraMDPreservesMentions(t *testing.T) {
 		{
 			name:     "mention in inline code",
 			input:    "Use `[~ankit]` here",
-			expected: "Use {{[~ankit]}} here\n\n",
+			expected: "Use {{[~ankit]}} here",
 		},
 		{
 			name:     "mention in code fence",
 			input:    "```\n[~ankit]\n```",
-			expected: "{code}\n[~ankit]\n{code}\n\n",
+			expected: "{code}\n[~ankit]\n{code}",
 		},
 		{
 			name:     "non-mention brackets stay escaped",
 			input:    `a [not a mention] b`,
-			expected: `a \[not a mention\] b`,
+			expected: "a \\[not a mention\\] b",
 		},
 	}
 
