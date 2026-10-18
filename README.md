@@ -952,7 +952,7 @@ Please [open an issue](https://github.com/rethab/jira-cli/issues/new/choose) in 
 
 3. Make changes, build the binary, and test your changes.
    ```sh
-   make deps install
+   make install
    ```
 
 4. Run CI steps locally before submitting a PR.

@@ -37,8 +37,6 @@ jobs:
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
 
-      # Deliberately no `make deps`: that vendors the dependencies, and
-      # govulncheck needs the module graph to map packages to advisories.
       - name: Run govulncheck
         run: govulncheck ./...
 
