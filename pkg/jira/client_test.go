@@ -340,6 +340,26 @@ func TestCFAccessRoundTripper(t *testing.T) {
 	_ = resp.Body.Close()
 }
 
+func TestCFAccessURLUsesHTTPS(t *testing.T) {
+	cases := []struct {
+		server   string
+		expected string
+	}{
+		{server: "https://jira.example.com", expected: "https://jira.example.com"},
+		{server: "http://jira.example.com", expected: "https://jira.example.com"},
+		{server: "http://jira.example.com/jira", expected: "https://jira.example.com/jira"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.server, func(t *testing.T) {
+			u, err := cfAccessURL(tc.server)
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, u.String())
+		})
+	}
+}
+
 func TestCFAccessRoundTripperSkipsOtherHosts(t *testing.T) {
 	next := mockRoundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		assert.Empty(t, req.Header.Get(cfAccessHeader))
