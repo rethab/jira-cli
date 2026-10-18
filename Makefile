@@ -84,7 +84,10 @@ ci: lint test
 jira.server:
 	docker compose up -d
 
+# Removes a vendor/ left over from the old `make deps`: Go builds from it
+# whenever it exists, and a stale one fails with "inconsistent vendoring".
 clean:
+	rm -rf vendor
 	go clean -x ./...
 
 distclean:
