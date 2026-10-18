@@ -207,7 +207,7 @@ func NewClient(c Config, opts ...ClientFunc) *Client {
 
 	if c.AuthType != nil && *c.AuthType == AuthTypeCFAccess {
 		token.Init("jira-cli")
-		tempAccessURL, err := url.Parse(c.Server)
+		tempAccessURL, err := cfAccessURL(c.Server)
 		if err != nil {
 			log.Fatalf("failed to parse server URL: %v", err)
 		}
@@ -215,8 +215,11 @@ func NewClient(c Config, opts ...ClientFunc) *Client {
 		if err != nil {
 			log.Fatalf("failed to get cloudflared app info: %v", err)
 		}
-		// zerolog.New logs every level, which would print cloudflared's internal debug lines as raw JSON.
-		logger := zerolog.New(os.Stderr).Level(zerolog.InfoLevel)
+		// cloudflared logs both through the logger passed in and through
+		// zerolog's global one, and zerolog prints every level by default,
+		// which would show its internal debug lines as raw JSON.
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+		logger := zerolog.New(os.Stderr)
 		tok, err := token.FetchToken(tempAccessURL, appInfo, false, false, &logger)
 		if err != nil {
 			log.Fatalf("failed to fetch cloudflared token: %v", err)
@@ -227,6 +230,20 @@ func NewClient(c Config, opts ...ClientFunc) *Client {
 	}
 
 	return &client
+}
+
+// cfAccessURL returns the URL to look up the Access application at. Access
+// only serves applications over https, and token.GetAppInfo doesn't follow
+// the redirect from http, so an http server URL would never find its app.
+func cfAccessURL(server string) (*url.URL, error) {
+	u, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme == "http" {
+		u.Scheme = "https"
+	}
+	return u, nil
 }
 
 type cfAccessRoundTripper struct {

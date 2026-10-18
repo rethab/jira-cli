@@ -15,6 +15,10 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+    ignore:
+      # Pinned to the last commit that builds with Go 1.26; newer ones require
+      # Go 1.27. Move it together with the toolchain, then drop this.
+      - dependency-name: "github.com/cloudflare/cloudflared"
     groups:
       # Patch and minor bumps get reviewed as a batch anyway; majors are the
       # ones worth looking at on their own.

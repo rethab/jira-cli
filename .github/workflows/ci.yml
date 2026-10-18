@@ -117,11 +117,12 @@ jobs:
           path: coverage.out
           if-no-files-found: error
 
-  # Releases cross-compile for seven targets, but only two of them can fail on
-  # their own: with cgo off and no OS-specific source in the tree, every 64-bit
-  # unix target type-checks exactly like the linux/amd64 built above. linux/386
-  # is where an int is 32 bits wide, and windows is the one GOOS that is not
-  # unix; the other four would only ever fail together with these.
+  # Releases cross-compile for seven targets, but only three of them can fail
+  # on their own: with cgo off, most 64-bit unix targets type-check exactly
+  # like the linux/amd64 built above. linux/386 is where an int is 32 bits
+  # wide, windows is the one GOOS that is not unix, and darwin links
+  # gopsutil's purego, whose fakecgo reaches into runtime internals; the other
+  # targets would only ever fail together with these.
   cross-compile:
     runs-on: ubuntu-latest
     strategy:
@@ -132,6 +133,8 @@ jobs:
             goarch: amd64
           - goos: linux
             goarch: '386'
+          - goos: darwin
+            goarch: arm64
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
