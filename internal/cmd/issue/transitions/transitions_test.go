@@ -42,4 +42,8 @@ func TestFormat(t *testing.T) {
 	assert.Equal(t, "Start work -> In Progress\nDone -> Done", format(transitions, false))
 	assert.Equal(t, "Start work\tIn Progress\nDone\tDone", format(transitions, true))
 	assert.Empty(t, format(nil, false))
+
+	noTarget := []*jira.Transition{newTransition("Reopen", "", true)}
+	assert.Equal(t, "Reopen", format(noTarget, false))
+	assert.Equal(t, "Reopen\t", format(noTarget, true))
 }

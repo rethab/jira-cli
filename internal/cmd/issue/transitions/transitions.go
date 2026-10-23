@@ -101,6 +101,11 @@ func format(transitions []*jira.Transition, plain bool) string {
 
 	lines := make([]string, 0, len(transitions))
 	for _, t := range transitions {
+		// Plain output keeps the empty column so scripts always get two fields.
+		if t.To.Name == "" && !plain {
+			lines = append(lines, t.Name)
+			continue
+		}
 		lines = append(lines, t.Name+sep+t.To.Name)
 	}
 	return strings.Join(lines, "\n")

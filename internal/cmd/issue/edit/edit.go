@@ -271,11 +271,21 @@ func getAnswers(params *editParams, issue *jira.Issue) {
 				if len(ans.AffectsVersions) > 0 {
 					params.affectsVersions = strings.Split(ans.AffectsVersions, ",")
 				}
-				if ans.OriginalEstimate != "" && ans.OriginalEstimate != issue.Fields.TimeTracking.OriginalEstimate {
-					params.originalEstimate = ans.OriginalEstimate
-				}
+				applyOriginalEstimateAnswer(params, issue, ans.OriginalEstimate)
 			}
 		}
+	}
+}
+
+// The answer wins over --original-estimate, like the other metadata. Confirming the
+// current estimate must not resend it, and an empty answer can't clear it.
+func applyOriginalEstimateAnswer(params *editParams, issue *jira.Issue, answer string) {
+	switch answer {
+	case "":
+	case issue.Fields.TimeTracking.OriginalEstimate:
+		params.originalEstimate = ""
+	default:
+		params.originalEstimate = answer
 	}
 }
 
@@ -507,7 +517,7 @@ func getMetadataQuestions(meta []string, issue *jira.Issue) []*survey.Question {
 				Name: "originalestimate",
 				Prompt: &survey.Input{
 					Message: "Original estimate",
-					Help:    "Duration in Jira's format. For eg: 1w 2d 3h 4m",
+					Help:    cmdcommon.OriginalEstimateHelp,
 					Default: issue.Fields.TimeTracking.OriginalEstimate,
 				},
 			})
