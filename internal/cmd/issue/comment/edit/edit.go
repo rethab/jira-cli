@@ -170,13 +170,11 @@ func askBody(client *jira.Client, issueKey, commentID string) string {
 
 // editorBody translates the body like 'jira issue edit' does for a description:
 // Cloud serves ADF and Server/Data Center wiki markup, and the v2 wiki rendering
-// of Cloud's ADF has escapes and smart-link forms FromJiraMD doesn't undo.
-// Unlike there, the markup is kept to ASCII, because whatever decoration the
-// translator adds, such as the pin before a smart link, would be saved back
-// into the comment.
+// of Cloud's ADF has escapes and smart-link forms FromJiraMD doesn't undo. A
+// smart link comes out as its bare URL, which the submit turns back into one.
 func editorBody(body any) string {
 	if doc, ok := body.(*adf.ADF); ok {
-		return adf.NewTranslator(doc, adf.NewJiraMarkdownTranslator(adf.WithMarkdownASCII())).Translate()
+		return adf.NewTranslator(doc, adf.NewJiraMarkdownTranslator()).Translate()
 	}
 	s, _ := body.(string)
 	return md.FromJiraMD(s)

@@ -69,8 +69,8 @@ Features not available upstream:
   attachments, since Jira would delete them, unless `--allow-image-loss` is passed.
   ([upstream #1005](https://github.com/ankitpokhrel/jira-cli/issues/1005))
 - **Smart links for issue URLs**: on Jira Cloud, bare URLs of issues on your site (`<server>/browse/ABC-1`) in the body
-  of `jira issue create`, `jira issue edit` and `jira issue comment add` render as smart links showing the issue's
-  summary and status. See [Create](#create).
+  of `jira issue create`, `jira issue edit`, `jira issue comment add` and `comment edit` render as smart links showing the
+  issue's summary and status. See [Create](#create).
 - **Original estimate on edit**: `jira issue edit ISSUE-1 --original-estimate 2h` (`-e`) sets the original estimate of
   an existing issue, leaving the remaining estimate to Jira. See [Edit](#edit).
   ([upstream #801](https://github.com/ankitpokhrel/jira-cli/pull/801))
@@ -423,8 +423,8 @@ $ echo "Description from stdin" | jira issue create -s"Summary" -tTask
 > The preview above shows a Markdown template passed in JiraCLI and how it is rendered in the Jira UI.
 
 On Jira Cloud, a bare URL of an issue on your site (`https://<site>.atlassian.net/browse/ABC-1`) in the description
-becomes a smart link that shows the issue's summary and status. This also applies to `jira issue edit` and
-`jira issue comment add`. Other URLs, URLs of issues on a different site, and Markdown links with their own text
+becomes a smart link that shows the issue's summary and status. This also applies to `jira issue edit`,
+`jira issue comment add` and `jira issue comment edit`. Other URLs, URLs of issues on a different site, and Markdown links with their own text
 (`[text](url)`) stay regular links, and so does everything on Server/Data Center. Punctuation directly after a bare
 URL is not part of the link; write `<url>` if it should be.
 

@@ -25,7 +25,7 @@ type JiraMarkdownTranslator struct {
 }
 
 // NewJiraMarkdownTranslator constructs jira markdown translator.
-func NewJiraMarkdownTranslator(opts ...MarkdownTranslatorOption) *JiraMarkdownTranslator {
+func NewJiraMarkdownTranslator() *JiraMarkdownTranslator {
 	openHooks := nodeTypeHook{
 		NodePanel:      nodePanelOpenHook,
 		InlineNodeCard: inlineCardOpenHook,
@@ -35,12 +35,12 @@ func NewJiraMarkdownTranslator(opts ...MarkdownTranslatorOption) *JiraMarkdownTr
 		NodePanel: nodePanelCloseHook,
 	}
 
-	opts = append([]MarkdownTranslatorOption{
-		WithMarkdownOpenHooks(openHooks),
-		WithMarkdownCloseHooks(closeHooks),
-	}, opts...)
-
-	return &JiraMarkdownTranslator{MarkdownTranslator: NewMarkdownTranslator(opts...)}
+	return &JiraMarkdownTranslator{
+		MarkdownTranslator: NewMarkdownTranslator(
+			WithMarkdownOpenHooks(openHooks),
+			WithMarkdownCloseHooks(closeHooks),
+		),
+	}
 }
 
 // Open implements TagOpener interface.
