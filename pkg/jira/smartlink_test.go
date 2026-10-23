@@ -64,13 +64,36 @@ func TestAddIssueCommentSmartLinks(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		body = string(b)
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"10"}`))
 	}))
 	defer server.Close()
 
 	// The server in the config is what decides which URLs are issues of this site.
 	client := NewClient(Config{Server: server.URL, Installation: InstallationTypeCloud}, WithTimeout(3*time.Second))
 
-	require.NoError(t, client.AddIssueComment("TEST-1", "Blocked by "+server.URL+"/browse/ABC-1.", false))
+	_, err := client.AddIssueComment("TEST-1", "Blocked by "+server.URL+"/browse/ABC-1.", false)
+	require.NoError(t, err)
+	assert.Contains(t, body, `Blocked by [`+server.URL+`/browse/ABC-1|`+server.URL+`/browse/ABC-1|smart-link].`)
+}
+
+func TestEditIssueCommentSmartLinks(t *testing.T) {
+	var body string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(`{"id":"10","body":"old"}`))
+			return
+		}
+		b, _ := io.ReadAll(r.Body)
+		body = string(b)
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL, Installation: InstallationTypeCloud}, WithTimeout(3*time.Second))
+
+	require.NoError(t, client.EditIssueComment("TEST-1", "10", "Blocked by "+server.URL+"/browse/ABC-1."))
 	assert.Contains(t, body, `Blocked by [`+server.URL+`/browse/ABC-1|`+server.URL+`/browse/ABC-1|smart-link].`)
 }

@@ -41,7 +41,7 @@ Features not available upstream:
 - **Worklog listing**: `jira issue worklog list ISSUE-1` lists an issue's worklogs, and `jira worklog list` shows what
   a user logged on a given day across all issues. See [Worklog](#worklog).
 - **Comment management**: `jira issue comment list`, `edit` and `delete` show the ids of an issue's comments, replace a
-  comment's body, and delete a comment. See [Comment](#comment).
+  comment's body, and delete a comment; `comment add` prints the id of the new comment. See [Comment](#comment).
   ([upstream #975](https://github.com/ankitpokhrel/jira-cli/issues/975))
 - **Attachments**: `jira issue attachment add`, `list` and `download` upload files to an issue, list its attachments, and
   download them. See [Attachment](#attachment). ([upstream #986](https://github.com/ankitpokhrel/jira-cli/pull/986))
@@ -631,7 +631,8 @@ The `comment` command provides a list of sub-commands to manage issue comments.
 ##### Add
 The `add` command lets you add a comment to an issue. The command supports both [GitHub-flavored](https://github.github.com/gfm/)
 and [Jira-flavored](https://jira.atlassian.com/secure/WikiRendererHelpAction.jspa?section=all) Markdown for writing
-comment. You can load pre-defined templates using `--template` flag.
+comment. You can load pre-defined templates using `--template` flag. It prints the id of the new comment, which `edit`
+and `delete` take.
 
 ```sh
 # Add a comment using an interactive prompt
@@ -693,8 +694,12 @@ $ jira issue comment edit ISSUE-1 10042
 # Pass the new body to skip the prompt
 $ jira issue comment edit ISSUE-1 10042 "Fixed comment body"
 
-# Same with a flag, and without any prompt, eg: to keep a "living" comment up to date from a script
+# Same with a flag, and without any prompt
 $ jira issue comment edit ISSUE-1 10042 --body "Fixed comment body" --no-input
+
+# Keep a "living" comment up to date from a script: add it once, then update it by id
+$ id=$(jira issue comment add ISSUE-1 "Plan v1" --no-input | sed -n 's/.*(ID: \([0-9]*\)).*/\1/p')
+$ jira issue comment update ISSUE-1 "$id" --body "Plan v2" --no-input
 
 # Load the new body from a template file or from standard input
 $ jira issue comment edit ISSUE-1 10042 --template /path/to/template.tmpl

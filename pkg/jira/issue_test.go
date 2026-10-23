@@ -554,20 +554,24 @@ func TestAddIssueComment(t *testing.T) {
 
 		if unexpectedStatusCode {
 			w.WriteHeader(400)
-		} else {
-			w.WriteHeader(201)
+			return
 		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(201)
+		_, _ = w.Write([]byte(`{"id":"10042","body":"comment","author":{"displayName":"Person A"}}`))
 	}))
 	defer server.Close()
 
 	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
 
-	err := client.AddIssueComment("TEST-1", "comment", false)
+	comment, err := client.AddIssueComment("TEST-1", "comment", false)
 	assert.NoError(t, err)
+	assert.Equal(t, "10042", comment.ID)
+	assert.Equal(t, "Person A", comment.Author.DisplayName)
 
 	unexpectedStatusCode = true
 
-	err = client.AddIssueComment("TEST-1", "comment", false)
+	_, err = client.AddIssueComment("TEST-1", "comment", false)
 	assertUnexpectedResponse(t, err)
 }
 

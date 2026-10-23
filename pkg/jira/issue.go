@@ -309,11 +309,12 @@ type issueCommentRequest struct {
 	Properties []issueCommentProperty `json:"properties"`
 }
 
-// AddIssueComment adds comment to an issue using POST /issue/{key}/comment endpoint.
-func (c *Client) AddIssueComment(key, comment string, internal bool) error {
+// AddIssueComment adds comment to an issue using POST /issue/{key}/comment endpoint
+// and returns the created comment.
+func (c *Client) AddIssueComment(key, comment string, internal bool) (*Comment, error) {
 	body, err := json.Marshal(&issueCommentRequest{Body: c.ToJiraMD(comment), Properties: []issueCommentProperty{{Key: commentInternalProperty, Value: issueCommentPropertyValue{Internal: internal}}}})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	path := fmt.Sprintf("/issue/%s/comment", key)
@@ -322,17 +323,22 @@ func (c *Client) AddIssueComment(key, comment string, internal bool) error {
 		"Content-Type": "application/json",
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if res == nil {
-		return ErrEmptyResponse
+		return nil, ErrEmptyResponse
 	}
 	defer func() { _ = res.Body.Close() }()
 
 	if res.StatusCode != http.StatusCreated {
-		return formatUnexpectedResponse(res)
+		return nil, formatUnexpectedResponse(res)
 	}
-	return nil
+
+	var out Comment
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 type issueWorklogRequest struct {
