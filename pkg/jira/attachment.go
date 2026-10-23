@@ -34,7 +34,7 @@ func (c *Client) GetIssueAttachments(key string) ([]Attachment, error) {
 		} `json:"fields"`
 	}
 
-	if err := c.getJSON(fmt.Sprintf("/issue/%s?fields=attachment", key), &out); err != nil {
+	if err := c.getJSON(baseURLv2, fmt.Sprintf("/issue/%s?fields=attachment", key), &out); err != nil {
 		return nil, err
 	}
 	return out.Fields.Attachment, nil

@@ -10,6 +10,7 @@ import (
 	"github.com/rethab/jira-cli/api"
 	"github.com/rethab/jira-cli/internal/cmdcommon"
 	"github.com/rethab/jira-cli/internal/cmdutil"
+	"github.com/rethab/jira-cli/pkg/adf"
 	"github.com/rethab/jira-cli/pkg/jira"
 	"github.com/rethab/jira-cli/pkg/md"
 	"github.com/rethab/jira-cli/pkg/surveyext"
@@ -145,7 +146,7 @@ func askBody(client *jira.Client, issueKey, commentID string) string {
 		s := cmdutil.Info("Fetching comment")
 		defer s.Stop()
 
-		return client.GetIssueComment(issueKey, commentID)
+		return api.ProxyGetIssueComment(client, issueKey, commentID)
 	}()
 	cmdutil.ExitIfError(err)
 
@@ -155,7 +156,7 @@ func askBody(client *jira.Client, issueKey, commentID string) string {
 		Prompt: &surveyext.JiraEditor{
 			Editor: &survey.Editor{
 				Message:       "Comment body",
-				Default:       md.FromJiraMD(existing.Body),
+				Default:       editorBody(existing.Body),
 				HideDefault:   true,
 				AppendDefault: true,
 			},
@@ -165,6 +166,20 @@ func askBody(client *jira.Client, issueKey, commentID string) string {
 	cmdutil.ExitIfError(survey.Ask(qs, &ans))
 
 	return ans.Body
+}
+
+// editorBody translates the body like 'jira issue edit' does for a description:
+// Cloud serves ADF and Server/Data Center wiki markup, and the v2 wiki rendering
+// of Cloud's ADF has escapes and smart-link forms FromJiraMD doesn't undo.
+// Unlike there, the markup is kept to ASCII, because whatever decoration the
+// translator adds, such as the pin before a smart link, would be saved back
+// into the comment.
+func editorBody(body any) string {
+	if doc, ok := body.(*adf.ADF); ok {
+		return adf.NewTranslator(doc, adf.NewJiraMarkdownTranslator(adf.WithMarkdownASCII())).Translate()
+	}
+	s, _ := body.(string)
+	return md.FromJiraMD(s)
 }
 
 func nextAction() *survey.Question {

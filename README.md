@@ -665,6 +665,8 @@ EOF
 
 ##### List
 The `list` command shows the comments of an issue, oldest first, including the id you need to edit or delete a comment.
+On Jira Cloud the raw output has the comment bodies in Atlassian Document Format, on Server and Data Center in wiki
+markup.
 
 ```sh
 $ jira issue comment list ISSUE-1

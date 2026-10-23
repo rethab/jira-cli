@@ -9,9 +9,71 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/rethab/jira-cli/pkg/adf"
 )
 
-func TestGetIssueComments(t *testing.T) {
+// smartLinkCommentADF is a Cloud comment with a smart link and a hyphenated
+// word, which the v2 api renders as escaped wiki markup.
+const smartLinkCommentADF = `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[` +
+	`{"type":"text","text":"jira-cli smart link test, see "},` +
+	`{"type":"inlineCard","attrs":{"url":"https://example.atlassian.net/browse/KEY-1"}},` +
+	`{"type":"text","text":"): done"}]}]}`
+
+func TestGetIssueCommentsV3(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/rest/api/3/issue/TEST-1/comment":
+			assert.Equal(t, "startAt=0&maxResults=100", r.URL.RawQuery)
+			_, _ = w.Write([]byte(`{"total":1,"comments":[{"id":"10","body":` + smartLinkCommentADF + `}]}`))
+		case "/rest/api/3/issue/TEST-1/comment/10":
+			assert.Equal(t, "expand=properties", r.URL.RawQuery)
+			_, _ = w.Write([]byte(`{"id":"10","body":` + smartLinkCommentADF + `}`))
+		default:
+			t.Errorf("unexpected path %q", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+	assertSmartLinkBody := func(body any) {
+		doc, ok := body.(*adf.ADF)
+		require.True(t, ok, "body is ADF")
+		para := doc.Content[0]
+		assert.Equal(t, "jira-cli smart link test, see ", para.Content[0].Text)
+		assert.Equal(t, adf.InlineNodeCard, para.Content[1].NodeType)
+	}
+
+	comments, err := client.GetIssueComments("TEST-1")
+	require.NoError(t, err)
+	require.Len(t, comments, 1)
+	assertSmartLinkBody(comments[0].Body)
+
+	comment, err := client.GetIssueComment("TEST-1", "10")
+	require.NoError(t, err)
+	assertSmartLinkBody(comment.Body)
+}
+
+func TestGetIssueCommentV2(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		assert.Equal(t, "/rest/api/2/issue/TEST-1/comment/10", r.URL.Path)
+		assert.Equal(t, "expand=properties", r.URL.RawQuery)
+		_, _ = w.Write([]byte(`{"id":"10","body":"some *bold*"}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+	comment, err := client.GetIssueCommentV2("TEST-1", "10")
+	assert.NoError(t, err)
+	assert.Equal(t, "some *bold*", comment.Body)
+}
+
+func TestGetIssueCommentsV2(t *testing.T) {
 	var unexpectedStatusCode bool
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +104,7 @@ func TestGetIssueComments(t *testing.T) {
 
 	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
 
-	out, err := client.GetIssueComments("TEST-1")
+	out, err := client.GetIssueCommentsV2("TEST-1")
 	assert.NoError(t, err)
 	assert.Len(t, out, 3)
 	assert.Equal(t, "3", out[2].ID)
@@ -50,7 +112,7 @@ func TestGetIssueComments(t *testing.T) {
 
 	unexpectedStatusCode = true
 
-	_, err = client.GetIssueComments("TEST-1")
+	_, err = client.GetIssueCommentsV2("TEST-1")
 	assertUnexpectedResponse(t, err)
 }
 

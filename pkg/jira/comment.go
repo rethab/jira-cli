@@ -28,13 +28,12 @@ type CommentVisibility struct {
 	Identifier string `json:"identifier,omitempty"`
 }
 
-// Comment is a single issue comment as returned by the v2 comment endpoints,
-// where the body is Jira wiki markup.
+// Comment is a single issue comment.
 type Comment struct {
 	ID           string             `json:"id"`
 	Author       User               `json:"author"`
 	UpdateAuthor User               `json:"updateAuthor"`
-	Body         string             `json:"body"`
+	Body         any                `json:"body"` // string in v2, adf.ADF in v3
 	Created      string             `json:"created"`
 	Updated      string             `json:"updated"`
 	Visibility   *CommentVisibility `json:"visibility,omitempty"`
@@ -49,16 +48,34 @@ type commentPage struct {
 }
 
 // GetIssueComments fetches every comment of an issue, oldest first, using the
-// paginated GET /issue/{key}/comment endpoint. The comment field embedded in
-// the issue resource is capped, so it can't be used to list them all.
+// paginated v3 GET /issue/{key}/comment endpoint, with the bodies as ADF. The
+// comment field embedded in the issue resource is capped, so it can't be used
+// to list them all.
 func (c *Client) GetIssueComments(key string) ([]Comment, error) {
+	comments, err := c.getIssueComments(baseURLv3, key)
+	if err != nil {
+		return nil, err
+	}
+	for i := range comments {
+		comments[i].Body = ifaceToADF(comments[i].Body)
+	}
+	return comments, nil
+}
+
+// GetIssueCommentsV2 is GetIssueComments for the v2 api, with the bodies as
+// wiki markup.
+func (c *Client) GetIssueCommentsV2(key string) ([]Comment, error) {
+	return c.getIssueComments(baseURLv2, key)
+}
+
+func (c *Client) getIssueComments(base, key string) ([]Comment, error) {
 	comments := []Comment{}
 
 	for {
 		path := fmt.Sprintf("/issue/%s/comment?startAt=%d&maxResults=%d", key, len(comments), commentPageSize)
 
 		var page commentPage
-		if err := c.getJSON(path, &page); err != nil {
+		if err := c.getJSON(base, path, &page); err != nil {
 			return nil, err
 		}
 
@@ -73,12 +90,27 @@ func (c *Client) GetIssueComments(key string) ([]Comment, error) {
 }
 
 // GetIssueComment fetches a single comment, including its properties, using
-// GET /issue/{key}/comment/{id} endpoint.
+// the v3 GET /issue/{key}/comment/{id} endpoint, with the body as ADF.
 func (c *Client) GetIssueComment(key, id string) (*Comment, error) {
+	comment, err := c.getIssueComment(baseURLv3, key, id)
+	if err != nil {
+		return nil, err
+	}
+	comment.Body = ifaceToADF(comment.Body)
+	return comment, nil
+}
+
+// GetIssueCommentV2 is GetIssueComment for the v2 api, with the body as wiki
+// markup.
+func (c *Client) GetIssueCommentV2(key, id string) (*Comment, error) {
+	return c.getIssueComment(baseURLv2, key, id)
+}
+
+func (c *Client) getIssueComment(base, key, id string) (*Comment, error) {
 	var comment Comment
 
 	path := fmt.Sprintf("/issue/%s/comment/%s?expand=properties", key, id)
-	if err := c.getJSON(path, &comment); err != nil {
+	if err := c.getJSON(base, path, &comment); err != nil {
 		return nil, err
 	}
 	return &comment, nil
@@ -96,7 +128,7 @@ type issueCommentEditRequest struct {
 // back with the new body. A PUT that omits them can reset them, which would
 // publish an internal comment.
 func (c *Client) EditIssueComment(key, id, comment string) error {
-	existing, err := c.GetIssueComment(key, id)
+	existing, err := c.GetIssueCommentV2(key, id)
 	if err != nil {
 		return err
 	}
@@ -153,9 +185,10 @@ func (c *Client) DeleteIssueComment(key, id string) error {
 	return nil
 }
 
-// getJSON sends a GET request to the v2 api and decodes a 200 response into out.
-func (c *Client) getJSON(path string, out any) error {
-	res, err := c.GetV2(context.Background(), path, Header{"Accept": "application/json"})
+// getJSON sends a GET request to the api at base, eg: baseURLv2, and decodes a
+// 200 response into out.
+func (c *Client) getJSON(base, path string, out any) error {
+	res, err := c.request(context.Background(), http.MethodGet, c.server+base+path, nil, Header{"Accept": "application/json"})
 	if err != nil {
 		return err
 	}

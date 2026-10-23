@@ -2,12 +2,39 @@ package view
 
 import (
 	"bytes"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/rethab/jira-cli/pkg/adf"
 	"github.com/rethab/jira-cli/pkg/jira"
 )
+
+func TestIssueCommentsRenderADF(t *testing.T) {
+	var doc adf.ADF
+	require.NoError(t, json.Unmarshal([]byte(`{"type":"doc","version":1,"content":[{"type":"paragraph","content":[
+		{"type":"text","text":"jira-cli smart link test, see "},
+		{"type":"inlineCard","attrs":{"url":"https://example.atlassian.net/browse/KEY-1"}},
+		{"type":"text","text":"): done"}
+	]}]}`), &doc))
+
+	var b bytes.Buffer
+	c := NewIssueComments([]jira.Comment{{
+		ID:      "10",
+		Author:  jira.User{DisplayName: "Person A"},
+		Created: "2026-01-14T09:00:00.000+0000",
+		Updated: "2026-01-14T09:00:00.000+0000",
+		Body:    &doc,
+	}}, ListDisplayFormat{}, WithListWriter(&b))
+	require.NoError(t, c.Render())
+
+	expected := `ID	AUTHOR	CREATED	UPDATED	BODY
+10	Person A	2026-01-14 09:00:00	2026-01-14 09:00:00	jira-cli smart link test, see https://example.atlassian.net/browse/KEY-1 ): done
+`
+	assert.Equal(t, expected, b.String())
+}
 
 func TestIssueCommentsRender(t *testing.T) {
 	var b bytes.Buffer

@@ -75,7 +75,7 @@ func list(cmd *cobra.Command, args []string) {
 		s := cmdutil.Info("Fetching comments")
 		defer s.Stop()
 
-		return client.GetIssueComments(issueKey)
+		return api.ProxyGetIssueComments(client, issueKey)
 	}()
 	cmdutil.ExitIfError(err)
 
