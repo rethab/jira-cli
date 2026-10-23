@@ -27,7 +27,8 @@ type JiraMarkdownTranslator struct {
 // NewJiraMarkdownTranslator constructs jira markdown translator.
 func NewJiraMarkdownTranslator() *JiraMarkdownTranslator {
 	openHooks := nodeTypeHook{
-		NodePanel: nodePanelOpenHook,
+		NodePanel:      nodePanelOpenHook,
+		InlineNodeCard: inlineCardOpenHook,
 	}
 
 	closeHooks := nodeTypeHook{
@@ -50,6 +51,13 @@ func (tr *JiraMarkdownTranslator) Open(n Connector, d int) string {
 // Close implements TagCloser interface.
 func (tr *JiraMarkdownTranslator) Close(n Connector) string {
 	return tr.MarkdownTranslator.Close(n)
+}
+
+// inlineCardOpenHook drops the pin the viewer prints before a card. The editor
+// text is submitted back as the description, so the pin would end up in it as a
+// literal character, and a further one on every edit.
+func inlineCardOpenHook(Connector) string {
+	return " "
 }
 
 func nodePanelOpenHook(n Connector) string {

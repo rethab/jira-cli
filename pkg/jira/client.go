@@ -19,6 +19,8 @@ import (
 
 	"github.com/cloudflare/cloudflared/token"
 	"github.com/rs/zerolog"
+
+	"github.com/rethab/jira-cli/pkg/md"
 )
 
 const (
@@ -141,6 +143,8 @@ type Config struct {
 	Insecure   *bool
 	Debug      bool
 	MTLSConfig MTLSConfig
+	// Installation is InstallationTypeCloud or InstallationTypeLocal.
+	Installation string
 }
 
 // Client is a jira client.
@@ -153,6 +157,9 @@ type Client struct {
 	token     string
 	timeout   time.Duration
 	debug     bool
+	// installation decides how markdown is converted: only Cloud understands
+	// smart links.
+	installation string
 }
 
 // ClientFunc decorates option for client.
@@ -161,11 +168,12 @@ type ClientFunc func(*Client)
 // NewClient instantiates new jira client.
 func NewClient(c Config, opts ...ClientFunc) *Client {
 	client := Client{
-		server:   strings.TrimSuffix(c.Server, "/"),
-		login:    c.Login,
-		token:    c.APIToken,
-		authType: c.AuthType,
-		debug:    c.Debug,
+		server:       strings.TrimSuffix(c.Server, "/"),
+		login:        c.Login,
+		token:        c.APIToken,
+		authType:     c.AuthType,
+		debug:        c.Debug,
+		installation: c.Installation,
 	}
 
 	for _, opt := range opts {
@@ -230,6 +238,16 @@ func NewClient(c Config, opts ...ClientFunc) *Client {
 	}
 
 	return &client
+}
+
+// ToJiraMD translates CommonMark to the wiki markup the v2 API expects. On
+// Cloud, bare URLs of issues on the configured server become smart links.
+func (c *Client) ToJiraMD(markdown string) string {
+	var opts []md.Option
+	if c.installation == InstallationTypeCloud {
+		opts = append(opts, md.WithSmartLinks(c.server))
+	}
+	return md.ToJiraMD(markdown, opts...)
 }
 
 // cfAccessURL returns the URL to look up the Access application at. Access

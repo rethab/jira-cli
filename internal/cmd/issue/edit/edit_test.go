@@ -30,7 +30,7 @@ func TestBuildEditRequestConvertsMarkdownBody(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			edr := buildEditRequest("TEST", &jira.Issue{}, &editParams{body: tc.body})
+			edr := buildEditRequest(newClient(jira.InstallationTypeLocal), "TEST", &jira.Issue{}, &editParams{body: tc.body})
 
 			assert.Equal(t, tc.wantBody, edr.Body)
 		})
@@ -94,7 +94,7 @@ func TestServerInteractiveEditRoundTrip(t *testing.T) {
 	// The user edits a single word in $EDITOR and saves.
 	edited := strings.Replace(prefilled, "Heading", "Updated heading", 1)
 
-	edr := buildEditRequest("TEST", issue, &editParams{body: edited})
+	edr := buildEditRequest(newClient(jira.InstallationTypeLocal), "TEST", issue, &editParams{body: edited})
 
 	assert.Equal(
 		t,
@@ -136,7 +136,7 @@ func TestBuildEditRequestMergesIssueFieldsWithParams(t *testing.T) {
 			skipNotify:      true,
 		}
 
-		edr := buildEditRequest("TEST", issue, params)
+		edr := buildEditRequest(newClient(jira.InstallationTypeLocal), "TEST", issue, params)
 
 		assert.Equal(t, "New summary", edr.Summary)
 		assert.Equal(t, "High", edr.Priority)
@@ -149,13 +149,13 @@ func TestBuildEditRequestMergesIssueFieldsWithParams(t *testing.T) {
 	})
 
 	t.Run("existing parent is kept when no parent is given", func(t *testing.T) {
-		edr := buildEditRequest("TEST", issue, &editParams{})
+		edr := buildEditRequest(newClient(jira.InstallationTypeLocal), "TEST", issue, &editParams{})
 
 		assert.Equal(t, "TEST-1", edr.ParentIssueKey)
 	})
 
 	t.Run("given parent overrides the existing one and is qualified with the project", func(t *testing.T) {
-		edr := buildEditRequest("TEST", issue, &editParams{parentIssueKey: "2"})
+		edr := buildEditRequest(newClient(jira.InstallationTypeLocal), "TEST", issue, &editParams{parentIssueKey: "2"})
 
 		assert.Equal(t, "TEST-2", edr.ParentIssueKey)
 	})
@@ -206,6 +206,42 @@ func TestCheckImageLoss(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func newClient(installation string) *jira.Client {
+	return jira.NewClient(jira.Config{Server: "https://example.atlassian.net", Installation: installation})
+}
+
+// An inlineCard has to come back out of the editor as a bare URL on its own, or
+// an edit that doesn't touch it would downgrade it to a plain link.
+func TestCloudInteractiveEditKeepsSmartLinks(t *testing.T) {
+	const url = "https://example.atlassian.net/browse/ABC-264"
+
+	issue := &jira.Issue{Fields: jira.IssueFields{Description: &adf.ADF{
+		Version: 1,
+		DocType: "doc",
+		Content: []*adf.Node{
+			{
+				NodeType: adf.NodeParagraph,
+				Content: []*adf.Node{
+					{NodeType: adf.ChildNodeText, NodeValue: adf.NodeValue{Text: "Blocked by"}},
+					{NodeType: adf.InlineNodeCard, Attributes: map[string]any{"url": url}},
+					{NodeType: adf.ChildNodeText, NodeValue: adf.NodeValue{Text: "until Friday"}},
+				},
+			},
+		},
+	}}}
+
+	prefilled := editorBody(issue)
+	assert.NotContains(t, prefilled, "📍")
+
+	smart := "[" + url + "|" + url + "|smart-link]"
+
+	edr := buildEditRequest(newClient(jira.InstallationTypeCloud), "TEST", issue, &editParams{body: prefilled})
+	assert.Equal(t, "Blocked by "+smart+" until Friday", strings.Join(strings.Fields(edr.Body), " "))
+
+	edr = buildEditRequest(newClient(jira.InstallationTypeLocal), "TEST", issue, &editParams{body: prefilled})
+	assert.NotContains(t, edr.Body, "smart-link")
 }
 
 func TestSameBody(t *testing.T) {

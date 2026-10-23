@@ -21,22 +21,48 @@ var mentionPattern = regexp.MustCompile(`\[~[^\[\]\n]+\]`)
 // nonceSize is the number of random bytes used to build a mention placeholder nonce.
 const nonceSize = 8
 
+// Option customizes ToJiraMD.
+type Option func(*options)
+
+type options struct {
+	issueURL *regexp.Regexp
+}
+
+// WithSmartLinks renders bare URLs of issues on the given Jira server
+// (<server>/browse/<KEY>) as smart links. Only Jira Cloud understands them,
+// so callers must not pass this option for Server/Data Center.
+func WithSmartLinks(server string) Option {
+	return func(o *options) {
+		server = strings.TrimRight(server, "/")
+		if server == "" {
+			return
+		}
+		o.issueURL = regexp.MustCompile(`^(?i:` + regexp.QuoteMeta(server) + `)/browse/[A-Z][A-Z0-9_]*-[0-9]+$`)
+	}
+}
+
 // ToJiraMD translates CommonMark to Jira flavored markdown.
-func ToJiraMD(md string) string {
+func ToJiraMD(md string, opts ...Option) string {
 	if md == "" {
 		return md
+	}
+
+	var o options
+	for _, opt := range opts {
+		opt(&o)
 	}
 
 	// blackfriday-confluence's escaper backslash-escapes `[`, `~` and `]`,
 	// which mangles a Jira mention like "[~displayname]" into
 	// "\[\~displayname\]" and stops it from pinging the user. Swap mentions
 	// out for placeholders that survive the render untouched, then restore
-	// them afterwards.
+	// them afterwards. Smart links are restored the same way, because the
+	// renderer would escape the "-" in the issue key inside the link text.
 	nonce := placeholderNonce()
-	var mentions []string
+	var restore []string
 	protected := mentionPattern.ReplaceAllStringFunc(md, func(mention string) string {
-		mentions = append(mentions, mention)
-		return placeholder(nonce, len(mentions)-1)
+		restore = append(restore, mention)
+		return placeholder(nonce, len(restore)-1)
 	})
 
 	renderer := &cf.Renderer{Flags: cf.IgnoreMacroEscaping}
@@ -51,6 +77,7 @@ func ToJiraMD(md string) string {
 
 	var buf bytes.Buffer
 	ast := r.Parse([]byte(protected))
+	splitTrailingPunctuation(ast)
 	ast.Walk(func(node *bf.Node, entering bool) bf.WalkStatus {
 		// Jira wiki image syntax (!url!) has no place for alt text, so the
 		// image node's children (the alt text) must be skipped, otherwise
@@ -68,6 +95,17 @@ func ToJiraMD(md string) string {
 			}
 			return bf.SkipChildren
 		}
+		if node.Type == bf.Link && o.issueURL != nil && isBareLink(node) && o.issueURL.Match(node.Destination) {
+			if entering {
+				url := string(node.Destination)
+				restore = append(restore, "["+url+"|"+url+"|smart-link]")
+				text := bf.NewNode(bf.Text)
+				text.Literal = []byte(placeholder(nonce, len(restore)-1))
+				renderer.RenderNode(&buf, text, true)
+				renderer.RenderNode(io.Discard, outputMarker, true)
+			}
+			return bf.SkipChildren
+		}
 		status := renderer.RenderNode(&buf, node, entering)
 		if node.Type == bf.Text && len(node.Literal) > 0 {
 			renderer.RenderNode(io.Discard, outputMarker, true)
@@ -76,8 +114,8 @@ func ToJiraMD(md string) string {
 	})
 
 	out := buf.String()
-	for i, mention := range mentions {
-		out = strings.ReplaceAll(out, placeholder(nonce, i), mention)
+	for i, original := range restore {
+		out = strings.ReplaceAll(out, placeholder(nonce, i), original)
 	}
 
 	// The renderer ends every block with blank lines, which Jira would store

@@ -111,7 +111,7 @@ func edit(cmd *cobra.Command, args []string) {
 
 	cmdutil.ExitIfError(checkImageLoss(issue, params))
 
-	edr := buildEditRequest(project, issue, params)
+	edr := buildEditRequest(client, project, issue, params)
 
 	err = func() error {
 		s := cmdutil.Info("Updating an issue...")
@@ -175,7 +175,7 @@ func sameBody(a, b string) bool {
 // The description body is always converted from markdown to Jira wiki markup since
 // the edit endpoint (v2) expects wiki markup regardless of whether the original
 // description was ADF (Cloud) or plain text (Server).
-func buildEditRequest(project string, issue *jira.Issue, params *editParams) *jira.EditRequest {
+func buildEditRequest(client *jira.Client, project string, issue *jira.Issue, params *editParams) *jira.EditRequest {
 	labels := params.labels
 	labels = append(labels, issue.Fields.Labels...)
 
@@ -205,7 +205,7 @@ func buildEditRequest(project string, issue *jira.Issue, params *editParams) *ji
 	edr := &jira.EditRequest{
 		ParentIssueKey:  parent,
 		Summary:         params.summary,
-		Body:            md.ToJiraMD(params.body),
+		Body:            client.ToJiraMD(params.body),
 		Priority:        params.priority,
 		Labels:          labels,
 		Components:      components,

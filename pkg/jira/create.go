@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/rethab/jira-cli/pkg/adf"
-	"github.com/rethab/jira-cli/pkg/md"
 )
 
 // CreateResponse struct holds response from POST /issue endpoint.
@@ -117,7 +116,7 @@ func (c *Client) create(req *CreateRequest, ver string) (*CreateResponse, error)
 	return &out, err
 }
 
-func (*Client) getRequestData(req *CreateRequest) *createRequest {
+func (c *Client) getRequestData(req *CreateRequest) *createRequest {
 	if req.Labels == nil {
 		req.Labels = []string{}
 	}
@@ -137,7 +136,7 @@ func (*Client) getRequestData(req *CreateRequest) *createRequest {
 
 	switch v := req.Body.(type) {
 	case string:
-		cf.Description = md.ToJiraMD(v)
+		cf.Description = c.ToJiraMD(v)
 	case *adf.ADF:
 		cf.Description = v
 	}

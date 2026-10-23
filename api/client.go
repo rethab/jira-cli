@@ -24,6 +24,9 @@ func Client(config jira.Config) *jira.Client {
 	if config.Server == "" {
 		config.Server = viper.GetString("server")
 	}
+	if config.Installation == "" {
+		config.Installation = viper.GetString("installation")
+	}
 	if config.Login == "" {
 		config.Login = viper.GetString("login")
 	}
