@@ -104,6 +104,9 @@ type IssueFields struct {
 	AffectsVersions []struct {
 		Name string `json:"name"`
 	} `json:"versions"`
+	TimeTracking struct {
+		OriginalEstimate string `json:"originalEstimate"`
+	} `json:"timetracking"`
 	Comment struct {
 		Comments []struct {
 			ID      string `json:"id"`
@@ -183,6 +186,10 @@ type Transition struct {
 	ID          json.Number `json:"id"`
 	Name        string      `json:"name"`
 	IsAvailable bool        `json:"isAvailable"`
+	// To is the status the issue ends up in. Transition names often differ from it.
+	To struct {
+		Name string `json:"name"`
+	} `json:"to"`
 }
 
 // User holds user info.

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/rethab/jira-cli/pkg/adf"
@@ -148,6 +149,12 @@ func TestBuildEditRequestMergesIssueFieldsWithParams(t *testing.T) {
 		assert.True(t, edr.SkipNotify)
 	})
 
+	t.Run("original estimate is passed on", func(t *testing.T) {
+		edr := buildEditRequest(newClient(jira.InstallationTypeLocal), "TEST", issue, &editParams{originalEstimate: "2h"})
+
+		assert.Equal(t, "2h", edr.OriginalEstimate)
+	})
+
 	t.Run("existing parent is kept when no parent is given", func(t *testing.T) {
 		edr := buildEditRequest(newClient(jira.InstallationTypeLocal), "TEST", issue, &editParams{})
 
@@ -285,6 +292,41 @@ func TestQuestionsSkipDescriptionEditorWhenItEmbedsMedia(t *testing.T) {
 			}
 
 			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestGetMetadataQuestionsOriginalEstimateDefaultsToCurrent(t *testing.T) {
+	issue := &jira.Issue{}
+	issue.Fields.TimeTracking.OriginalEstimate = "1d 4h"
+
+	qs := getMetadataQuestions([]string{metadataOriginalEstimate}, issue)
+
+	if assert.Len(t, qs, 1) {
+		assert.Equal(t, "originalestimate", qs[0].Name)
+		assert.Equal(t, "1d 4h", qs[0].Prompt.(*survey.Input).Default)
+	}
+}
+
+func TestApplyOriginalEstimateAnswer(t *testing.T) {
+	issue := &jira.Issue{}
+	issue.Fields.TimeTracking.OriginalEstimate = "1d"
+
+	cases := []struct {
+		name, flag, answer, want string
+	}{
+		{name: "new answer is used", answer: "3h", want: "3h"},
+		{name: "answer wins over the flag", flag: "2h", answer: "3h", want: "3h"},
+		{name: "confirming the current estimate sends nothing", flag: "2h", answer: "1d", want: ""},
+		{name: "empty answer keeps the flag", flag: "2h", answer: "", want: "2h"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			params := &editParams{originalEstimate: tc.flag}
+
+			applyOriginalEstimateAnswer(params, issue, tc.answer)
+
+			assert.Equal(t, tc.want, params.originalEstimate)
 		})
 	}
 }

@@ -46,28 +46,34 @@ func TestTransitions(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected := []*Transition{
-		{
-			ID:          "11",
-			Name:        "To Do",
-			IsAvailable: true,
-		},
-		{
-			ID:          "21",
-			Name:        "In Progress",
-			IsAvailable: true,
-		},
-		{
-			ID:          "31",
-			Name:        "Done",
-			IsAvailable: false,
-		},
+		{ID: "11", Name: "To Do", IsAvailable: true},
+		{ID: "21", Name: "Start work", IsAvailable: true},
+		{ID: "31", Name: "Done", IsAvailable: false},
 	}
+	expected[0].To.Name = "To Do"
+	expected[1].To.Name = "In Progress"
+	expected[2].To.Name = "Closed"
 	assert.Equal(t, expected, actual)
 
+	want, err := os.ReadFile("./testdata/transitions.json")
+	assert.NoError(t, err)
+
+	raw, err := client.TransitionsRaw("TEST")
+	assert.NoError(t, err)
+	assert.Equal(t, string(want), raw)
+
 	apiVersion2 = true
+
+	raw, err = client.TransitionsV2Raw("TEST")
+	assert.NoError(t, err)
+	assert.Equal(t, string(want), raw)
+
 	unexpectedStatusCode = true
 
 	_, err = client.TransitionsV2("TEST")
+	assertUnexpectedResponse(t, err)
+
+	_, err = client.TransitionsV2Raw("TEST")
 	assertUnexpectedResponse(t, err)
 }
 

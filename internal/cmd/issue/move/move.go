@@ -250,7 +250,15 @@ func (mc *moveCmd) verifyTransition(it string) (*jira.Transition, error) {
 		if strings.ToLower(t.Name) == st {
 			tr = t
 		}
-		all = append(all, fmt.Sprintf("'%s'", t.Name))
+		// Unavailable transitions would be refused below, so don't suggest them.
+		if it == jira.InstallationTypeCloud && !t.IsAvailable {
+			continue
+		}
+		if t.To.Name != "" {
+			all = append(all, fmt.Sprintf("'%s' -> '%s'", t.Name, t.To.Name))
+		} else {
+			all = append(all, fmt.Sprintf("'%s'", t.Name))
+		}
 	}
 
 	if tr == nil {

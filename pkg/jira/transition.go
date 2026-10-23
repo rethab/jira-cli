@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -54,7 +55,32 @@ func (c *Client) TransitionsV2(key string) ([]*Transition, error) {
 	return c.transitions(key, apiVersion2)
 }
 
+// TransitionsRaw fetches valid transitions same as Transitions but returns the raw API response body string.
+func (c *Client) TransitionsRaw(key string) (string, error) {
+	body, err := c.transitionsBody(key, apiVersion3)
+	return string(body), err
+}
+
+// TransitionsV2Raw fetches valid transitions same as TransitionsV2 but returns the raw API response body string.
+func (c *Client) TransitionsV2Raw(key string) (string, error) {
+	body, err := c.transitionsBody(key, apiVersion2)
+	return string(body), err
+}
+
 func (c *Client) transitions(key, ver string) ([]*Transition, error) {
+	body, err := c.transitionsBody(key, ver)
+	if err != nil {
+		return nil, err
+	}
+
+	var out transitionResponse
+
+	err = json.Unmarshal(body, &out)
+
+	return out.Transitions, err
+}
+
+func (c *Client) transitionsBody(key, ver string) ([]byte, error) {
 	path := fmt.Sprintf("/issue/%s/transitions", key)
 
 	var (
@@ -81,11 +107,7 @@ func (c *Client) transitions(key, ver string) ([]*Transition, error) {
 		return nil, formatUnexpectedResponse(res)
 	}
 
-	var out transitionResponse
-
-	err = json.NewDecoder(res.Body).Decode(&out)
-
-	return out.Transitions, err
+	return io.ReadAll(res.Body)
 }
 
 // Transition moves issue from one state to another using POST /issue/{key}/transitions endpoint.

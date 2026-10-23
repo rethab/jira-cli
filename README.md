@@ -66,6 +66,11 @@ Features not available upstream:
 - **Smart links for issue URLs**: on Jira Cloud, bare URLs of issues on your site (`<server>/browse/ABC-1`) in the body
   of `jira issue create`, `jira issue edit` and `jira issue comment add` render as smart links showing the issue's
   summary and status. See [Create](#create).
+- **Original estimate on edit**: `jira issue edit ISSUE-1 --original-estimate 2h` (`-e`) sets the original estimate of
+  an existing issue, leaving the remaining estimate to Jira. See [Edit](#edit).
+  ([upstream #801](https://github.com/ankitpokhrel/jira-cli/pull/801))
+- **Listing transitions**: `jira issue transitions ISSUE-1` prints the transitions an issue can take, with the status
+  each one leads to, without moving the issue. See [Move/Transition](#movetransition).
 - **Verifiable builds**: every release ships SLSA provenance and an SBOM, and every merge to `main` publishes a snapshot
   Homebrew cask and Docker image. See [Installation](#installation).
 
@@ -438,6 +443,11 @@ $ jira issue edit ISSUE-1 -s"New updated summary" --no-input
 # so the command refuses unless you explicitly accept the loss
 $ jira issue edit ISSUE-1 -b"New description" --allow-image-loss
 
+# Set the original estimate in Jira's duration format; the remaining estimate is left to Jira
+$ jira issue edit ISSUE-1 --original-estimate "1d 4h" --no-input
+
+# In the interactive prompt, "OriginalEstimate" can be picked under "What would you like to add?"
+
 # Use minus (-) to remove label, component or fixVersion
 # For instance, to edit issue to
 #   - remove label p2, component FE, fixVersion v1.0
@@ -495,6 +505,22 @@ $ jira issue move ISSUE-1 Done -RFixed -a$(jira me)
 ```
 
 To transition the selected issue from the TUI, press `m`.
+
+The `transitions` command lists what an issue can be moved to without moving it. Each line is the transition name and
+the status it leads to, which often differ ("Start work" leads to "In Progress"). On Cloud, transitions that are not
+available are left out, as `move` does.
+
+```sh
+$ jira issue transitions ISSUE-1
+Start work -> In Progress
+Done -> Done
+
+# Tab separated for scripts
+$ jira issue transitions ISSUE-1 --plain
+
+# Raw Jira API response, including transitions that are not available
+$ jira issue transitions ISSUE-1 --raw
+```
 
 #### View
 The `view` command lets you see issue details in a terminal. Atlassian document is roughly converted to Markdown

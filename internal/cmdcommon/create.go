@@ -67,12 +67,15 @@ And, this field is mandatory when creating a sub-task.`)
 	cmd.Flags().StringArrayP("component", "C", []string{}, prefix+" components")
 	cmd.Flags().StringArray("fix-version", []string{}, "Release info (fixVersions)")
 	cmd.Flags().StringArray("affects-version", []string{}, "Release info (affectsVersions)")
-	cmd.Flags().StringP("original-estimate", "e", "", prefix+" Original estimate")
+	cmd.Flags().StringP("original-estimate", "e", "", OriginalEstimateHelp)
 	cmd.Flags().StringToString("custom", custom, "Set custom fields")
 	cmd.Flags().StringP("template", "T", "", "Path to a file to read body/description from")
 	cmd.Flags().Bool("web", false, "Open in web browser after successful creation")
 	cmd.Flags().Bool("no-input", false, "Disable prompt for non-required fields")
 }
+
+// OriginalEstimateHelp is the help text of the original estimate flag.
+const OriginalEstimateHelp = "Original estimate (1w 2d 3h 4m: weeks, days, hours, minutes)"
 
 // GetNextAction provide user an option to select next action.
 func GetNextAction() *survey.Question {
@@ -90,14 +93,15 @@ func GetNextAction() *survey.Question {
 	}
 }
 
-// GetMetadata gathers a list of metadata users wants to add.
-func GetMetadata() []*survey.Question {
+// GetMetadata gathers a list of metadata users wants to add. Commands that support more
+// than the common options pass them as extra.
+func GetMetadata(extra ...string) []*survey.Question {
 	return []*survey.Question{
 		{
 			Name: "metadata",
 			Prompt: &survey.MultiSelect{
 				Message: "What would you like to add?",
-				Options: []string{"Priority", "Components", "Labels", "FixVersions", "AffectsVersions"},
+				Options: append([]string{"Priority", "Components", "Labels", "FixVersions", "AffectsVersions"}, extra...),
 			},
 		},
 	}

@@ -4,17 +4,29 @@
     {
       "id": "11",
       "name": "To Do",
-      "isAvailable": true
+      "isAvailable": true,
+      "to": {
+        "id": "10000",
+        "name": "To Do"
+      }
     },
     {
       "id": "21",
-      "name": "In Progress",
-      "isAvailable": true
+      "name": "Start work",
+      "isAvailable": true,
+      "to": {
+        "id": "10001",
+        "name": "In Progress"
+      }
     },
     {
       "id": "31",
       "name": "Done",
-      "isAvailable": false
+      "isAvailable": false,
+      "to": {
+        "id": "10002",
+        "name": "Closed"
+      }
     }
   ]
 }
