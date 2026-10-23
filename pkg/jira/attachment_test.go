@@ -119,8 +119,20 @@ func TestDownloadAttachment(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Run("cloud link is re-based onto the configured server", func(t *testing.T) {
+	t.Run("cloud link on the configured server", func(t *testing.T) {
 		client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+		var buf bytes.Buffer
+		err := client.DownloadAttachment(Attachment{
+			Filename: "a.txt",
+			Content:  server.URL + "/rest/api/3/attachment/content/10",
+		}, &buf)
+		assert.NoError(t, err)
+		assert.Equal(t, "cloud content", buf.String())
+	})
+
+	t.Run("cloud link on the browse server is re-based onto the configured server", func(t *testing.T) {
+		client := NewClient(Config{Server: server.URL, BrowseServer: "https://example.atlassian.net/"}, WithTimeout(3*time.Second))
 
 		var buf bytes.Buffer
 		err := client.DownloadAttachment(Attachment{
@@ -131,16 +143,29 @@ func TestDownloadAttachment(t *testing.T) {
 		assert.Equal(t, "cloud content", buf.String())
 	})
 
-	t.Run("server link is re-based onto the configured server", func(t *testing.T) {
+	t.Run("server link below the base path", func(t *testing.T) {
 		client := NewClient(Config{Server: server.URL + "/jira"}, WithTimeout(3*time.Second))
 
 		var buf bytes.Buffer
 		err := client.DownloadAttachment(Attachment{
 			Filename: "a b.txt",
-			Content:  "http://jira.internal.example.com/jira/secure/attachment/11/a%20b.txt",
+			Content:  server.URL + "/jira/secure/attachment/11/a%20b.txt",
 		}, &buf)
 		assert.NoError(t, err)
 		assert.Equal(t, "server content", buf.String())
+	})
+
+	t.Run("link on another host is refused", func(t *testing.T) {
+		client := NewClient(Config{Server: server.URL, BrowseServer: "https://example.atlassian.net"}, WithTimeout(3*time.Second))
+
+		for _, link := range []string{
+			"https://evil.example.com/rest/api/3/attachment/content/10",
+			"https://example.atlassian.net.evil.example.com/rest/api/3/attachment/content/10",
+			"https://example.atlassian.net:8443/rest/api/3/attachment/content/10",
+		} {
+			err := client.DownloadAttachment(Attachment{Filename: "a.txt", Content: link}, io.Discard)
+			assert.ErrorContains(t, err, "on another host", link)
+		}
 	})
 
 	t.Run("unrecognized link is refused", func(t *testing.T) {
@@ -148,7 +173,7 @@ func TestDownloadAttachment(t *testing.T) {
 
 		err := client.DownloadAttachment(Attachment{
 			Filename: "a.txt",
-			Content:  "https://evil.example.com/files/a.txt",
+			Content:  server.URL + "/files/a.txt",
 		}, io.Discard)
 		assert.ErrorContains(t, err, "unrecognized download link")
 	})
@@ -196,7 +221,7 @@ func TestDownloadAttachmentRedirectDropsCredentials(t *testing.T) {
 	var buf bytes.Buffer
 	err := client.DownloadAttachment(Attachment{
 		Filename: "a.txt",
-		Content:  "https://example.atlassian.net/rest/api/2/attachment/content/10",
+		Content:  server.URL + "/rest/api/2/attachment/content/10",
 	}, &buf)
 	assert.NoError(t, err)
 	assert.Equal(t, "media content", buf.String())

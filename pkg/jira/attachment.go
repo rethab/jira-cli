@@ -85,12 +85,12 @@ func (c *Client) AddIssueAttachment(key, filename string, content io.Reader) ([]
 //
 // The download link Jira reports differs by installation: Cloud points at
 // /rest/api/{v}/attachment/content/{id} on the site, and Server/Data Center at
-// /secure/attachment/{id}/{name} below its base URL. Only the part from there
-// on is used, re-based onto the configured server, so credentials only ever go
-// to that server, whatever host the link names. That also makes Cloud links
-// work through the Atlassian API gateway (scoped tokens), and Server links when
-// Jira's base URL differs from the configured one. Cloud then redirects to its
-// media host, and net/http drops the Authorization header on that redirect.
+// /secure/attachment/{id}/{name} below its base URL. A link on any host other
+// than the configured server or browse server is refused, so the attachment
+// list can't send credentials elsewhere. Only the part from those markers on is
+// used, re-based onto the configured server, which makes site links work
+// through the Atlassian API gateway (scoped tokens). Cloud then redirects to
+// its media host, and net/http drops the Authorization header on that redirect.
 func (c *Client) DownloadAttachment(a Attachment, w io.Writer) error {
 	link, err := c.attachmentURL(a)
 	if err != nil {
@@ -121,6 +121,10 @@ func (c *Client) attachmentURL(a Attachment) (string, error) {
 		return "", fmt.Errorf("attachment %q has no usable download link", a.Filename)
 	}
 
+	if !c.isOwnHost(u) {
+		return "", fmt.Errorf("attachment %q has a download link on another host %q", a.Filename, u.Host)
+	}
+
 	p := u.EscapedPath()
 	for _, marker := range []string{"/rest/api/", "/secure/attachment/"} {
 		if i := strings.Index(p, marker); i >= 0 {
@@ -132,4 +136,32 @@ func (c *Client) attachmentURL(a Attachment) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("attachment %q has an unrecognized download link %q", a.Filename, a.Content)
+}
+
+func (c *Client) isOwnHost(u *url.URL) bool {
+	for _, own := range []string{c.server, c.browseServer} {
+		if own == "" {
+			continue
+		}
+		if o, err := url.Parse(own); err == nil && sameHost(o, u) {
+			return true
+		}
+	}
+	return false
+}
+
+// A Server/Data Center base URL may use http while the configured server uses
+// https, so only host and effective port are compared, not the scheme.
+func sameHost(a, b *url.URL) bool {
+	return strings.EqualFold(a.Hostname(), b.Hostname()) && effectivePort(a) == effectivePort(b)
+}
+
+func effectivePort(u *url.URL) string {
+	if p := u.Port(); p != "" {
+		return p
+	}
+	if strings.EqualFold(u.Scheme, "http") {
+		return "80"
+	}
+	return "443"
 }

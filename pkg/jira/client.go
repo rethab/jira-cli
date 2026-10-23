@@ -156,11 +156,14 @@ type Client struct {
 	transport http.RoundTripper
 	insecure  bool
 	server    string
-	login     string
-	authType  *AuthType
-	token     string
-	timeout   time.Duration
-	debug     bool
+	// browseServer is BrowseServer, kept to recognize links Jira reports on
+	// the site host rather than the API gateway.
+	browseServer string
+	login        string
+	authType     *AuthType
+	token        string
+	timeout      time.Duration
+	debug        bool
 	// mdOptions decide how markdown is converted: only Cloud understands
 	// smart links.
 	mdOptions []md.Option
@@ -172,11 +175,12 @@ type ClientFunc func(*Client)
 // NewClient instantiates new jira client.
 func NewClient(c Config, opts ...ClientFunc) *Client {
 	client := Client{
-		server:   strings.TrimSuffix(c.Server, "/"),
-		login:    c.Login,
-		token:    c.APIToken,
-		authType: c.AuthType,
-		debug:    c.Debug,
+		server:       strings.TrimSuffix(c.Server, "/"),
+		browseServer: strings.TrimSuffix(c.BrowseServer, "/"),
+		login:        c.Login,
+		token:        c.APIToken,
+		authType:     c.AuthType,
+		debug:        c.Debug,
 	}
 	// A hand-written config or JIRA_INSTALLATION may not use jira init's casing.
 	if strings.EqualFold(strings.TrimSpace(c.Installation), InstallationTypeCloud) {
