@@ -2,6 +2,7 @@ package jira
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -19,6 +20,8 @@ import (
 
 	"github.com/cloudflare/cloudflared/token"
 	"github.com/rs/zerolog"
+
+	"github.com/rethab/jira-cli/pkg/md"
 )
 
 const (
@@ -141,6 +144,11 @@ type Config struct {
 	Insecure   *bool
 	Debug      bool
 	MTLSConfig MTLSConfig
+	// Installation is InstallationTypeCloud or InstallationTypeLocal.
+	Installation string
+	// BrowseServer is the site URL people open issues at, if it isn't Server,
+	// e.g. because Server is the API gateway for scoped tokens.
+	BrowseServer string
 }
 
 // Client is a jira client.
@@ -153,6 +161,9 @@ type Client struct {
 	token     string
 	timeout   time.Duration
 	debug     bool
+	// mdOptions decide how markdown is converted: only Cloud understands
+	// smart links.
+	mdOptions []md.Option
 }
 
 // ClientFunc decorates option for client.
@@ -166,6 +177,10 @@ func NewClient(c Config, opts ...ClientFunc) *Client {
 		token:    c.APIToken,
 		authType: c.AuthType,
 		debug:    c.Debug,
+	}
+	// A hand-written config or JIRA_INSTALLATION may not use jira init's casing.
+	if strings.EqualFold(strings.TrimSpace(c.Installation), InstallationTypeCloud) {
+		client.mdOptions = []md.Option{md.WithSmartLinks(cmp.Or(c.BrowseServer, client.server))}
 	}
 
 	for _, opt := range opts {
@@ -230,6 +245,12 @@ func NewClient(c Config, opts ...ClientFunc) *Client {
 	}
 
 	return &client
+}
+
+// ToJiraMD translates CommonMark to the wiki markup the v2 API expects. On
+// Cloud, bare URLs of issues on the configured server become smart links.
+func (c *Client) ToJiraMD(markdown string) string {
+	return md.ToJiraMD(markdown, c.mdOptions...)
 }
 
 // cfAccessURL returns the URL to look up the Access application at. Access

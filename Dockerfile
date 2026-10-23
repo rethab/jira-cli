@@ -9,7 +9,7 @@
 # Pinned to the same patch as the `toolchain` directive in go.mod: whenever a
 # floating tag lags it, GOTOOLCHAIN=auto downloads the pinned toolchain during
 # every one of the four platform builds, and fails outright without a proxy.
-FROM --platform=$BUILDPLATFORM golang:1.26.9-alpine3.24 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.10-alpine3.24 AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
