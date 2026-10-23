@@ -15,8 +15,9 @@ const bytesPerUnit = 1024
 
 // AttachmentDisplayFormat controls how an attachment view is rendered.
 type AttachmentDisplayFormat struct {
-	Plain bool
-	CSV   bool
+	Plain     bool
+	CSV       bool
+	NoHeaders bool
 }
 
 // IssueAttachmentsOption is a functional option to configure IssueAttachments.
@@ -60,6 +61,9 @@ func (a *IssueAttachments) Render() error {
 		return renderCSV(os.Stdout, data)
 	}
 	if a.Display.Plain {
+		if a.Display.NoHeaders {
+			data = data[1:]
+		}
 		return renderPlain(tabwriter.NewWriter(os.Stdout, 0, tabWidth, 1, '\t', 0), data, "\t")
 	}
 	if err := renderPlain(a.writer, data, "\t"); err != nil {

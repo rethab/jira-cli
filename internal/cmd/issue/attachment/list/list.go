@@ -17,6 +17,9 @@ const (
 # Print in plain mode
 $ jira issue attachment list ISSUE-1 --plain
 
+# Plain mode without headers, eg: for scripts
+$ jira issue attachment list ISSUE-1 --plain --no-headers
+
 # Print in CSV format
 $ jira issue attachment list ISSUE-1 --csv
 
@@ -43,6 +46,7 @@ func NewCmdAttachmentList() *cobra.Command {
 
 	cmd.Flags().Bool("plain", false, "Display output in plain mode")
 	cmd.Flags().Bool("csv", false, "Print output in CSV format")
+	cmd.Flags().Bool("no-headers", false, "Don't display table headers in plain mode. Works only with --plain")
 	cmd.Flags().Bool("raw", false, "Print raw Jira API response")
 
 	return &cmd
@@ -58,6 +62,9 @@ func list(cmd *cobra.Command, args []string) {
 	cmdutil.ExitIfError(err)
 
 	raw, err := cmd.Flags().GetBool("raw")
+	cmdutil.ExitIfError(err)
+
+	noHeaders, err := cmd.Flags().GetBool("no-headers")
 	cmdutil.ExitIfError(err)
 
 	client := api.DefaultClient(viper.GetBool("debug"))
@@ -80,6 +87,6 @@ func list(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	v := view.NewIssueAttachments(attachments, view.AttachmentDisplayFormat{Plain: plain, CSV: csv})
+	v := view.NewIssueAttachments(attachments, view.AttachmentDisplayFormat{Plain: plain, CSV: csv, NoHeaders: noHeaders})
 	cmdutil.ExitIfError(v.Render())
 }

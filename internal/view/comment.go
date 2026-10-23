@@ -13,8 +13,9 @@ import (
 
 // CommentDisplayFormat controls how a comment view is rendered.
 type CommentDisplayFormat struct {
-	Plain bool
-	CSV   bool
+	Plain     bool
+	CSV       bool
+	NoHeaders bool
 }
 
 // IssueCommentsOption is a functional option to configure IssueComments.
@@ -58,6 +59,9 @@ func (c *IssueComments) Render() error {
 		return renderCSV(os.Stdout, data)
 	}
 	if c.Display.Plain {
+		if c.Display.NoHeaders {
+			data = data[1:]
+		}
 		return renderPlain(tabwriter.NewWriter(os.Stdout, 0, tabWidth, 1, '\t', 0), data, "\t")
 	}
 	if err := renderPlain(c.writer, data, "\t"); err != nil {

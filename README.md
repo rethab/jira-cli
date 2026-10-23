@@ -42,6 +42,7 @@ Features not available upstream:
   a user logged on a given day across all issues. See [Worklog](#worklog).
 - **Comment management**: `jira issue comment list`, `edit` and `delete` show the ids of an issue's comments, replace a
   comment's body, and delete a comment. See [Comment](#comment).
+  ([upstream #975](https://github.com/ankitpokhrel/jira-cli/issues/975))
 - **Attachments**: `jira issue attachment add`, `list` and `download` upload files to an issue, list its attachments, and
   download them. See [Attachment](#attachment).
 - **Release creation**: `jira release create --name v1.0` creates a project version, optionally with a description,
@@ -671,12 +672,18 @@ $ jira issue comment list ISSUE-1
 $ jira issue comment list ISSUE-1 --plain
 $ jira issue comment list ISSUE-1 --csv
 $ jira issue comment list ISSUE-1 --raw
+
+# Plain output without the header row is easy to parse in scripts: the first column is the comment id
+$ jira issue comment list ISSUE-1 --plain --no-headers | cut -f1
+
+# The raw output has the full author, eg: to find the latest comment of a user
+$ jira issue comment list ISSUE-1 --raw | jq -r 'map(select(.author.emailAddress == "me@example.com")) | last | .id'
 ```
 
 ##### Edit
 The `edit` command replaces the body of a comment. The body is written in Markdown and read like in `add`: from the
 positional argument, from `--template`, or from standard input. Without a body, your editor opens with the current body
-of the comment. Whether a comment is internal, and who it is visible to, is kept as it is.
+of the comment. Whether a comment is internal, and who it is visible to, is kept as it is. `update` is an alias of `edit`.
 
 ```sh
 # Edit the comment in your editor
@@ -684,6 +691,9 @@ $ jira issue comment edit ISSUE-1 10042
 
 # Pass the new body to skip the prompt
 $ jira issue comment edit ISSUE-1 10042 "Fixed comment body"
+
+# Same with a flag, and without any prompt, eg: to keep a "living" comment up to date from a script
+$ jira issue comment edit ISSUE-1 10042 --body "Fixed comment body" --no-input
 
 # Load the new body from a template file or from standard input
 $ jira issue comment edit ISSUE-1 10042 --template /path/to/template.tmpl

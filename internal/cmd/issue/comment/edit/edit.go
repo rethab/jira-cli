@@ -28,6 +28,12 @@ $ jira issue comment edit ISSUE-1 10042
 # Pass the new body to skip the prompt
 $ jira issue comment edit ISSUE-1 10042 "Fixed comment"
 
+# Same as above, with a flag, and without any prompt for scripts
+$ jira issue comment edit ISSUE-1 10042 --body "Fixed comment" --no-input
+
+# 'update' is an alias of 'edit'
+$ jira issue comment update ISSUE-1 10042 "Fixed comment"
+
 # Load the new body from a template file
 $ jira issue comment edit ISSUE-1 10042 --template /path/to/template.tmpl
 
@@ -37,7 +43,7 @@ $ jira issue comment edit ISSUE-1 10042 --template -
 # Or, use pipe to read input directly from standard input
 $ echo "Comment from stdin" | jira issue comment edit ISSUE-1 10042
 
-# Positional argument takes precedence over the template flag
+# Positional argument takes precedence over the body and template flags
 $ jira issue comment edit ISSUE-1 10042 "comment from arg" --template /path/to/template.tmpl`
 )
 
@@ -48,6 +54,7 @@ func NewCmdCommentEdit() *cobra.Command {
 		Short:   "Edit a comment of an issue",
 		Long:    helpText,
 		Example: examples,
+		Aliases: []string{"update"},
 		Args:    cobra.RangeArgs(2, 3),
 		Annotations: map[string]string{
 			"help:args": "ISSUE-KEY\tIssue key of the source issue, eg: ISSUE-1\n" +
@@ -57,6 +64,7 @@ func NewCmdCommentEdit() *cobra.Command {
 		Run: edit,
 	}
 
+	cmd.Flags().String("body", "", "New body of the comment; the positional argument takes precedence")
 	cmd.Flags().StringP("template", "T", "", "Path to a file to read comment body from")
 	cmd.Flags().Bool("no-input", false, "Disable prompt for non-required fields")
 
@@ -72,6 +80,9 @@ func edit(cmd *cobra.Command, args []string) {
 		body = args[2]
 	}
 
+	flagBody, err := cmd.Flags().GetString("body")
+	cmdutil.ExitIfError(err)
+
 	template, err := cmd.Flags().GetString("template")
 	cmdutil.ExitIfError(err)
 
@@ -82,19 +93,20 @@ func edit(cmd *cobra.Command, args []string) {
 		noInput = true
 	}
 
-	var templateBody string
-	if template != "" || cmdutil.StdinHasData() {
+	client := api.DefaultClient(viper.GetBool("debug"))
+
+	if body == "" {
+		body = flagBody
+	}
+
+	// Stdin is only read when no body was passed, so a script that gives one
+	// never blocks on a pipe nobody closes.
+	if body == "" && (template != "" || cmdutil.StdinHasData()) {
 		b, err := cmdutil.ReadFile(template)
 		if err != nil {
 			cmdutil.Failed("Error: %s", err)
 		}
-		templateBody = string(b)
-	}
-
-	client := api.DefaultClient(viper.GetBool("debug"))
-
-	if body == "" {
-		body = templateBody
+		body = string(b)
 	}
 
 	if body == "" && noInput {
