@@ -72,6 +72,30 @@ func TestConstructCustomFieldsForEditArrayOfStrings(t *testing.T) {
 	assert.Equal(t, expected, data.Update.M.customFields["customfield_10001"])
 }
 
+func TestEditOriginalEstimate(t *testing.T) {
+	var gotBody string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		assert.NoError(t, err)
+		gotBody = string(body)
+
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+	err := client.Edit("TEST-1", &EditRequest{OriginalEstimate: "1d 4h"})
+	assert.NoError(t, err)
+	assert.Contains(t, gotBody, `"timetracking":[{"edit":{"originalEstimate":"1d 4h"}}]`)
+	assert.NotContains(t, gotBody, "remainingEstimate")
+
+	err = client.Edit("TEST-1", &EditRequest{Summary: "New summary"})
+	assert.NoError(t, err)
+	assert.NotContains(t, gotBody, "timetracking")
+}
+
 func TestEdit(t *testing.T) {
 	var gotRawQuery string
 

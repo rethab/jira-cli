@@ -30,6 +30,9 @@ type EditRequest struct {
 	Components      []string
 	FixVersions     []string
 	AffectsVersions []string
+	// OriginalEstimate is a duration in Jira's format, e.g. "1d 4h". The remaining
+	// estimate is left to Jira.
+	OriginalEstimate string
 	// CustomFields holds all custom fields passed
 	// while editing the issue.
 	CustomFields map[string]string
@@ -116,6 +119,11 @@ type editFields struct {
 			Name string `json:"name,omitempty"`
 		} `json:"remove,omitempty"`
 	} `json:"versions,omitempty"`
+	TimeTracking []struct {
+		Edit struct {
+			OriginalEstimate string `json:"originalEstimate"`
+		} `json:"edit"`
+	} `json:"timetracking,omitempty"`
 
 	customFields customField
 }
@@ -328,6 +336,16 @@ func getRequestDataForEdit(req *EditRequest) *editRequest {
 		}
 
 		update.M.AffectsVersions = versions
+	}
+
+	if req.OriginalEstimate != "" {
+		update.M.TimeTracking = []struct {
+			Edit struct {
+				OriginalEstimate string `json:"originalEstimate"`
+			} `json:"edit"`
+		}{{Edit: struct {
+			OriginalEstimate string `json:"originalEstimate"`
+		}{OriginalEstimate: req.OriginalEstimate}}}
 	}
 
 	fields := struct {

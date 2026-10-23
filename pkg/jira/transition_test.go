@@ -46,22 +46,13 @@ func TestTransitions(t *testing.T) {
 	assert.NoError(t, err)
 
 	expected := []*Transition{
-		{
-			ID:          "11",
-			Name:        "To Do",
-			IsAvailable: true,
-		},
-		{
-			ID:          "21",
-			Name:        "In Progress",
-			IsAvailable: true,
-		},
-		{
-			ID:          "31",
-			Name:        "Done",
-			IsAvailable: false,
-		},
+		{ID: "11", Name: "To Do", IsAvailable: true},
+		{ID: "21", Name: "Start work", IsAvailable: true},
+		{ID: "31", Name: "Done", IsAvailable: false},
 	}
+	expected[0].To.Name = "To Do"
+	expected[1].To.Name = "In Progress"
+	expected[2].To.Name = "Closed"
 	assert.Equal(t, expected, actual)
 
 	apiVersion2 = true

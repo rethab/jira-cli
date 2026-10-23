@@ -28,6 +28,9 @@ $ jira issue edit ISSUE-1 -s"New Bug" -yHigh -lbug -lurgent -CBackend -b"Bug des
 # Use --no-input option to disable interactive prompt
 $ jira issue edit ISSUE-1 -s"New updated summary" --no-input
 
+# Set the original estimate; the remaining estimate is left to Jira
+$ jira issue edit ISSUE-1 -e"1d 4h" --no-input
+
 # Replacing a description that contains inline images or attachments would delete them,
 # so the command refuses unless you explicitly accept the loss
 $ jira issue edit ISSUE-1 -b"New description" --allow-image-loss
@@ -203,16 +206,17 @@ func buildEditRequest(client *jira.Client, project string, issue *jira.Issue, pa
 	}
 
 	edr := &jira.EditRequest{
-		ParentIssueKey:  parent,
-		Summary:         params.summary,
-		Body:            client.ToJiraMD(params.body),
-		Priority:        params.priority,
-		Labels:          labels,
-		Components:      components,
-		FixVersions:     fixVersions,
-		AffectsVersions: affectsVersions,
-		CustomFields:    params.customFields,
-		SkipNotify:      params.skipNotify,
+		ParentIssueKey:   parent,
+		Summary:          params.summary,
+		Body:             client.ToJiraMD(params.body),
+		Priority:         params.priority,
+		Labels:           labels,
+		Components:       components,
+		FixVersions:      fixVersions,
+		AffectsVersions:  affectsVersions,
+		OriginalEstimate: params.originalEstimate,
+		CustomFields:     params.customFields,
+		SkipNotify:       params.skipNotify,
 	}
 	if configuredCustomFields, err := cmdcommon.GetConfiguredCustomFields(); err == nil {
 		cmdcommon.ValidateCustomFields(edr.CustomFields, configuredCustomFields)
@@ -362,21 +366,22 @@ func (ec *editCmd) questions(issue *jira.Issue, originalBody string) []*survey.Q
 }
 
 type editParams struct {
-	issueKey        string
-	parentIssueKey  string
-	summary         string
-	body            string
-	priority        string
-	assignee        string
-	labels          []string
-	components      []string
-	fixVersions     []string
-	affectsVersions []string
-	customFields    map[string]string
-	skipNotify      bool
-	allowImageLoss  bool
-	noInput         bool
-	debug           bool
+	issueKey         string
+	parentIssueKey   string
+	summary          string
+	body             string
+	priority         string
+	assignee         string
+	labels           []string
+	components       []string
+	fixVersions      []string
+	affectsVersions  []string
+	originalEstimate string
+	customFields     map[string]string
+	skipNotify       bool
+	allowImageLoss   bool
+	noInput          bool
+	debug            bool
 }
 
 func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *editParams {
@@ -407,6 +412,9 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 	affectsVersions, err := flags.GetStringArray("affects-version")
 	cmdutil.ExitIfError(err)
 
+	originalEstimate, err := flags.GetString("original-estimate")
+	cmdutil.ExitIfError(err)
+
 	custom, err := flags.GetStringToString("custom")
 	cmdutil.ExitIfError(err)
 
@@ -422,21 +430,22 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 	debug := viper.GetBool("debug")
 
 	return &editParams{
-		issueKey:        cmdutil.GetJiraIssueKey(project, args[0]),
-		parentIssueKey:  parentIssueKey,
-		summary:         summary,
-		body:            body,
-		priority:        priority,
-		assignee:        assignee,
-		labels:          labels,
-		components:      components,
-		fixVersions:     fixVersions,
-		affectsVersions: affectsVersions,
-		customFields:    custom,
-		skipNotify:      skipNotify,
-		allowImageLoss:  allowImageLoss,
-		noInput:         noInput,
-		debug:           debug,
+		issueKey:         cmdutil.GetJiraIssueKey(project, args[0]),
+		parentIssueKey:   parentIssueKey,
+		summary:          summary,
+		body:             body,
+		priority:         priority,
+		assignee:         assignee,
+		labels:           labels,
+		components:       components,
+		fixVersions:      fixVersions,
+		affectsVersions:  affectsVersions,
+		originalEstimate: originalEstimate,
+		customFields:     custom,
+		skipNotify:       skipNotify,
+		allowImageLoss:   allowImageLoss,
+		noInput:          noInput,
+		debug:            debug,
 	}
 }
 
@@ -515,6 +524,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringArrayP("component", "C", []string{}, "Replace components")
 	cmd.Flags().StringArray("fix-version", []string{}, "Add/Append release info (fixVersions)")
 	cmd.Flags().StringArray("affects-version", []string{}, "Add/Append release info (affectsVersions)")
+	cmd.Flags().StringP("original-estimate", "e", "", "Edit original estimate (e.g. 2h, 1d 4h)")
 	cmd.Flags().StringToString("custom", custom, "Edit custom fields")
 	cmd.Flags().Bool("skip-notify", false, "Do not notify watchers about the issue update")
 	cmd.Flags().Bool("allow-image-loss", false, "Replace a description even if its inline images and attachments get deleted")
