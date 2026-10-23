@@ -26,6 +26,7 @@ func TestClientToJiraMDSmartLinks(t *testing.T) {
 	}{
 		{name: "cloud", installation: InstallationTypeCloud, expected: smartLinkCloud},
 		{name: "server", installation: InstallationTypeLocal, expected: smartLinkLocal},
+		{name: "cloud in lower case", installation: "cloud", expected: smartLinkCloud},
 		{name: "unknown installation", installation: "", expected: smartLinkLocal},
 	}
 
@@ -36,6 +37,17 @@ func TestClientToJiraMDSmartLinks(t *testing.T) {
 			assert.Equal(t, tc.expected, client.ToJiraMD(smartLinkMD))
 		})
 	}
+}
+
+// With a scoped token, the server is the API gateway, which nobody links to.
+func TestClientToJiraMDSmartLinksUseBrowseServer(t *testing.T) {
+	client := NewClient(Config{
+		Server:       "https://api.atlassian.com/ex/jira/cloud-id",
+		BrowseServer: smartLinkServer,
+		Installation: InstallationTypeCloud,
+	})
+
+	assert.Equal(t, smartLinkCloud, client.ToJiraMD(smartLinkMD))
 }
 
 func TestCreateRequestDescriptionSmartLinks(t *testing.T) {

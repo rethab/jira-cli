@@ -2,6 +2,7 @@ package jira
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -145,6 +146,9 @@ type Config struct {
 	MTLSConfig MTLSConfig
 	// Installation is InstallationTypeCloud or InstallationTypeLocal.
 	Installation string
+	// BrowseServer is the site URL people open issues at, if it isn't Server,
+	// e.g. because Server is the API gateway for scoped tokens.
+	BrowseServer string
 }
 
 // Client is a jira client.
@@ -157,9 +161,9 @@ type Client struct {
 	token     string
 	timeout   time.Duration
 	debug     bool
-	// installation decides how markdown is converted: only Cloud understands
+	// mdOptions decide how markdown is converted: only Cloud understands
 	// smart links.
-	installation string
+	mdOptions []md.Option
 }
 
 // ClientFunc decorates option for client.
@@ -168,12 +172,15 @@ type ClientFunc func(*Client)
 // NewClient instantiates new jira client.
 func NewClient(c Config, opts ...ClientFunc) *Client {
 	client := Client{
-		server:       strings.TrimSuffix(c.Server, "/"),
-		login:        c.Login,
-		token:        c.APIToken,
-		authType:     c.AuthType,
-		debug:        c.Debug,
-		installation: c.Installation,
+		server:   strings.TrimSuffix(c.Server, "/"),
+		login:    c.Login,
+		token:    c.APIToken,
+		authType: c.AuthType,
+		debug:    c.Debug,
+	}
+	// A hand-written config or JIRA_INSTALLATION may not use jira init's casing.
+	if strings.EqualFold(strings.TrimSpace(c.Installation), InstallationTypeCloud) {
+		client.mdOptions = []md.Option{md.WithSmartLinks(cmp.Or(c.BrowseServer, client.server))}
 	}
 
 	for _, opt := range opts {
@@ -243,11 +250,7 @@ func NewClient(c Config, opts ...ClientFunc) *Client {
 // ToJiraMD translates CommonMark to the wiki markup the v2 API expects. On
 // Cloud, bare URLs of issues on the configured server become smart links.
 func (c *Client) ToJiraMD(markdown string) string {
-	var opts []md.Option
-	if c.installation == InstallationTypeCloud {
-		opts = append(opts, md.WithSmartLinks(c.server))
-	}
-	return md.ToJiraMD(markdown, opts...)
+	return md.ToJiraMD(markdown, c.mdOptions...)
 }
 
 // cfAccessURL returns the URL to look up the Access application at. Access

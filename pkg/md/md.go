@@ -32,12 +32,15 @@ type options struct {
 // (<server>/browse/<KEY>) as smart links. Only Jira Cloud understands them,
 // so callers must not pass this option for Server/Data Center.
 func WithSmartLinks(server string) Option {
+	server = strings.TrimRight(server, "/")
+	if server == "" {
+		return func(*options) {}
+	}
+	// Compiled here rather than in the closure so that a caller holding on to
+	// the option doesn't recompile it on every conversion.
+	issueURL := regexp.MustCompile(`^(?i:` + regexp.QuoteMeta(server) + `)/browse/[A-Z][A-Z0-9_]*-[0-9]+$`)
 	return func(o *options) {
-		server = strings.TrimRight(server, "/")
-		if server == "" {
-			return
-		}
-		o.issueURL = regexp.MustCompile(`^(?i:` + regexp.QuoteMeta(server) + `)/browse/[A-Z][A-Z0-9_]*-[0-9]+$`)
+		o.issueURL = issueURL
 	}
 }
 
@@ -77,7 +80,7 @@ func ToJiraMD(md string, opts ...Option) string {
 
 	var buf bytes.Buffer
 	ast := r.Parse([]byte(protected))
-	splitTrailingPunctuation(ast)
+	splitTrailingPunctuation(ast, []byte(protected))
 	ast.Walk(func(node *bf.Node, entering bool) bf.WalkStatus {
 		// Jira wiki image syntax (!url!) has no place for alt text, so the
 		// image node's children (the alt text) must be skipped, otherwise

@@ -65,8 +65,7 @@ Features not available upstream:
   ([upstream #1005](https://github.com/ankitpokhrel/jira-cli/issues/1005))
 - **Smart links for issue URLs**: on Jira Cloud, bare URLs of issues on your site (`<server>/browse/ABC-1`) in the body
   of `jira issue create`, `jira issue edit` and `jira issue comment add` render as smart links showing the issue's
-  summary and status. Punctuation after a URL, such as `):`, no longer becomes part of the link. See
-  [Create](#create).
+  summary and status. See [Create](#create).
 - **Verifiable builds**: every release ships SLSA provenance and an SBOM, and every merge to `main` publishes a snapshot
   Homebrew cask and Docker image. See [Installation](#installation).
 
@@ -416,8 +415,8 @@ $ echo "Description from stdin" | jira issue create -s"Summary" -tTask
 On Jira Cloud, a bare URL of an issue on your site (`https://<site>.atlassian.net/browse/ABC-1`) in the description
 becomes a smart link that shows the issue's summary and status. This also applies to `jira issue edit` and
 `jira issue comment add`. Other URLs, URLs of issues on a different site, and Markdown links with their own text
-(`[text](url)`) stay regular links, and so does everything on Server/Data Center. Punctuation directly after a URL
-is never part of the link.
+(`[text](url)`) stay regular links, and so does everything on Server/Data Center. Punctuation directly after a bare
+URL is not part of the link; write `<url>` if it should be.
 
 ```sh
 $ jira issue create -s"Follow-up" -tTask -b"Blocked by https://example.atlassian.net/browse/ABC-1 (see the thread)."

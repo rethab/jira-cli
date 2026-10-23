@@ -20,10 +20,16 @@ func isBareLink(n *bf.Node) bool {
 // end of an autolink into a text node behind the link. Its own heuristic
 // only drops a single trailing ".", "," or ";" and a bracket it can close
 // within the line, so "(see https://x/y):" would otherwise end up in the link.
-func splitTrailingPunctuation(ast *bf.Node) {
+// That bracket check also counts openers inside the URL, so it cuts the ")"
+// off "https://x/Pikachu_(Electric)"; such a bracket is moved back in first.
+//
+// source is the markdown the AST was parsed from. A `<url>` or `[url](url)`
+// spells out where the URL ends, so it is left alone, but the AST can't tell
+// those apart from a bare URL; finding the delimited form in the source can.
+func splitTrailingPunctuation(ast *bf.Node, source []byte) {
 	var links []*bf.Node
 	ast.Walk(func(n *bf.Node, entering bool) bf.WalkStatus {
-		if entering && n.Type == bf.Link && isBareLink(n) {
+		if entering && n.Type == bf.Link && isBareLink(n) && !isDelimited(n.Destination, source) {
 			links = append(links, n)
 		}
 		return bf.GoToNext
@@ -31,6 +37,8 @@ func splitTrailingPunctuation(ast *bf.Node) {
 
 	// Done after the walk because it inserts siblings.
 	for _, link := range links {
+		reclaimClosingBrackets(link)
+
 		keep := trimmedLen(link.Destination)
 		if keep == len(link.Destination) {
 			continue
@@ -50,9 +58,45 @@ func splitTrailingPunctuation(ast *bf.Node) {
 	}
 }
 
+func isDelimited(url, source []byte) bool {
+	return bytes.Contains(source, append(append([]byte("<"), url...), '>')) ||
+		bytes.Contains(source, append(append([]byte("]("), url...), ')'))
+}
+
+// reclaimClosingBrackets appends closing brackets from the text right after the
+// link to it, as long as each one closes a bracket the URL opened.
+func reclaimClosingBrackets(link *bf.Node) {
+	next := link.Next
+	if next == nil || next.Type != bf.Text {
+		return
+	}
+
+	n := 0
+	dest := bytes.Clone(link.Destination)
+	for n < len(next.Literal) {
+		c := next.Literal[n]
+		opener, ok := bracketOpener(c)
+		if !ok || bytes.Count(dest, []byte{c}) >= bytes.Count(dest, []byte{opener}) {
+			break
+		}
+		dest = append(dest, c)
+		n++
+	}
+	if n == 0 {
+		return
+	}
+
+	link.Destination = dest
+	link.FirstChild.Literal = dest
+	next.Literal = next.Literal[n:]
+	if len(next.Literal) == 0 {
+		next.Unlink()
+	}
+}
+
 // trimmedLen returns the length of url without trailing punctuation. A closing
-// bracket only counts as punctuation if the URL doesn't open it itself, so
-// that "https://x/Pikachu_(Electric)" keeps its parenthesis.
+// bracket or quote only counts as punctuation if the URL doesn't open it
+// itself, so that "https://x/Pikachu_(Electric)" keeps its parenthesis.
 func trimmedLen(url []byte) int {
 	// Never trim into the scheme.
 	floor := 1
@@ -63,26 +107,31 @@ func trimmedLen(url []byte) int {
 	end := len(url)
 	for end > floor {
 		c := url[end-1]
-		if bytes.IndexByte([]byte(".,:;!?'\""), c) >= 0 {
-			end--
-			continue
-		}
-
-		var opener byte
-		switch c {
-		case ')':
-			opener = '('
-		case ']':
-			opener = '['
-		case '}':
-			opener = '{'
+		switch {
+		case bytes.IndexByte([]byte(".,:;!?"), c) >= 0:
+		case c == '\'' || c == '"':
+			if bytes.Count(url[:end], []byte{c})%2 == 0 {
+				return end
+			}
 		default:
-			return end
-		}
-		if bytes.Count(url[:end], []byte{c}) <= bytes.Count(url[:end], []byte{opener}) {
-			return end
+			opener, ok := bracketOpener(c)
+			if !ok || bytes.Count(url[:end], []byte{c}) <= bytes.Count(url[:end], []byte{opener}) {
+				return end
+			}
 		}
 		end--
 	}
 	return end
+}
+
+func bracketOpener(closer byte) (byte, bool) {
+	switch closer {
+	case ')':
+		return '(', true
+	case ']':
+		return '[', true
+	case '}':
+		return '{', true
+	}
+	return 0, false
 }
