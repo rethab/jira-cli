@@ -150,7 +150,7 @@ func TestBuildEditRequestMergesIssueFieldsWithParams(t *testing.T) {
 	})
 
 	t.Run("original estimate is passed on", func(t *testing.T) {
-		edr := buildEditRequest("TEST", issue, &editParams{originalEstimate: "2h"})
+		edr := buildEditRequest(newClient(jira.InstallationTypeLocal), "TEST", issue, &editParams{originalEstimate: "2h"})
 
 		assert.Equal(t, "2h", edr.OriginalEstimate)
 	})
