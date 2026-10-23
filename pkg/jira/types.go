@@ -104,6 +104,9 @@ type IssueFields struct {
 	AffectsVersions []struct {
 		Name string `json:"name"`
 	} `json:"versions"`
+	TimeTracking struct {
+		OriginalEstimate string `json:"originalEstimate"`
+	} `json:"timetracking"`
 	Comment struct {
 		Comments []struct {
 			ID      string `json:"id"`

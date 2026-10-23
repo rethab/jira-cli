@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/rethab/jira-cli/pkg/adf"
@@ -292,5 +293,17 @@ func TestQuestionsSkipDescriptionEditorWhenItEmbedsMedia(t *testing.T) {
 
 			assert.Equal(t, tc.want, got)
 		})
+	}
+}
+
+func TestGetMetadataQuestionsOriginalEstimateDefaultsToCurrent(t *testing.T) {
+	issue := &jira.Issue{}
+	issue.Fields.TimeTracking.OriginalEstimate = "1d 4h"
+
+	qs := getMetadataQuestions([]string{metadataOriginalEstimate}, issue)
+
+	if assert.Len(t, qs, 1) {
+		assert.Equal(t, "originalestimate", qs[0].Name)
+		assert.Equal(t, "1d 4h", qs[0].Prompt.(*survey.Input).Default)
 	}
 }

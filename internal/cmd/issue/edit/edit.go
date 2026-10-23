@@ -42,6 +42,9 @@ $ echo "Description from stdin" | jira issue edit ISSUE-1 -s"New updated summary
 $ jira issue edit ISSUE-1 --label -urgent --component -BE --fix-version -v1.0`
 )
 
+// Only offered when editing, since "create" doesn't prompt for it.
+const metadataOriginalEstimate = "OriginalEstimate"
+
 // NewCmdEdit is an edit command.
 func NewCmdEdit() *cobra.Command {
 	cmd := cobra.Command{
@@ -237,17 +240,18 @@ func getAnswers(params *editParams, issue *jira.Issue) {
 			cmdutil.Failed("Action aborted")
 		case cmdcommon.ActionMetadata:
 			ans := struct{ Metadata []string }{}
-			err := survey.Ask(cmdcommon.GetMetadata(), &ans)
+			err := survey.Ask(cmdcommon.GetMetadata(metadataOriginalEstimate), &ans)
 			cmdutil.ExitIfError(err)
 
 			if len(ans.Metadata) > 0 {
 				qs := getMetadataQuestions(ans.Metadata, issue)
 				ans := struct {
-					Priority        string
-					Labels          string
-					Components      string
-					FixVersions     string
-					AffectsVersions string
+					Priority         string
+					Labels           string
+					Components       string
+					FixVersions      string
+					AffectsVersions  string
+					OriginalEstimate string
 				}{}
 				err := survey.Ask(qs, &ans)
 				cmdutil.ExitIfError(err)
@@ -266,6 +270,9 @@ func getAnswers(params *editParams, issue *jira.Issue) {
 				}
 				if len(ans.AffectsVersions) > 0 {
 					params.affectsVersions = strings.Split(ans.AffectsVersions, ",")
+				}
+				if ans.OriginalEstimate != "" && ans.OriginalEstimate != issue.Fields.TimeTracking.OriginalEstimate {
+					params.originalEstimate = ans.OriginalEstimate
 				}
 			}
 		}
@@ -495,6 +502,15 @@ func getMetadataQuestions(meta []string, issue *jira.Issue) []*survey.Question {
 					Default: strings.Join(fixVersions, ","),
 				},
 			})
+		case metadataOriginalEstimate:
+			qs = append(qs, &survey.Question{
+				Name: "originalestimate",
+				Prompt: &survey.Input{
+					Message: "Original estimate",
+					Help:    "Duration in Jira's format. For eg: 1w 2d 3h 4m",
+					Default: issue.Fields.TimeTracking.OriginalEstimate,
+				},
+			})
 		case "AffectsVersions":
 			qs = append(qs, &survey.Question{
 				Name: "affectsversions",
@@ -524,7 +540,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringArrayP("component", "C", []string{}, "Replace components")
 	cmd.Flags().StringArray("fix-version", []string{}, "Add/Append release info (fixVersions)")
 	cmd.Flags().StringArray("affects-version", []string{}, "Add/Append release info (affectsVersions)")
-	cmd.Flags().StringP("original-estimate", "e", "", "Edit original estimate (e.g. 2h, 1d 4h)")
+	cmd.Flags().StringP("original-estimate", "e", "", cmdcommon.OriginalEstimateHelp)
 	cmd.Flags().StringToString("custom", custom, "Edit custom fields")
 	cmd.Flags().Bool("skip-notify", false, "Do not notify watchers about the issue update")
 	cmd.Flags().Bool("allow-image-loss", false, "Replace a description even if its inline images and attachments get deleted")

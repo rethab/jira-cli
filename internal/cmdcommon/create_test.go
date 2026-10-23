@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -103,4 +104,13 @@ func TestValidateCustomFields(t *testing.T) {
 			assert.Contains(t, out, "Invalid custom fields used in the command: "+tc.invalid)
 		})
 	}
+}
+
+func TestGetMetadataOptions(t *testing.T) {
+	options := func(extra ...string) []string {
+		return GetMetadata(extra...)[0].Prompt.(*survey.MultiSelect).Options
+	}
+
+	assert.NotContains(t, options(), "OriginalEstimate", "create has no handling for it")
+	assert.Contains(t, options("OriginalEstimate"), "OriginalEstimate")
 }
