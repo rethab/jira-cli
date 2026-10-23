@@ -55,10 +55,25 @@ func TestTransitions(t *testing.T) {
 	expected[2].To.Name = "Closed"
 	assert.Equal(t, expected, actual)
 
+	want, err := os.ReadFile("./testdata/transitions.json")
+	assert.NoError(t, err)
+
+	raw, err := client.TransitionsRaw("TEST")
+	assert.NoError(t, err)
+	assert.Equal(t, string(want), raw)
+
 	apiVersion2 = true
+
+	raw, err = client.TransitionsV2Raw("TEST")
+	assert.NoError(t, err)
+	assert.Equal(t, string(want), raw)
+
 	unexpectedStatusCode = true
 
 	_, err = client.TransitionsV2("TEST")
+	assertUnexpectedResponse(t, err)
+
+	_, err = client.TransitionsV2Raw("TEST")
 	assertUnexpectedResponse(t, err)
 }
 

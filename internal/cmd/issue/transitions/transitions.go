@@ -21,7 +21,7 @@ Each line shows the transition name and the status it leads to, as in "Start wor
 # Tab separated "transition name" and "target status", for scripts
 $ jira issue transitions ISSUE-1 --plain
 
-# Print the transitions as JSON
+# Print the raw Jira API response, including transitions that are not available
 $ jira issue transitions ISSUE-1 --raw`
 )
 
@@ -42,7 +42,7 @@ func NewCmdTransitions() *cobra.Command {
 	cmd.Flags().SortFlags = false
 
 	cmd.Flags().Bool("plain", false, "Print tab separated transition name and target status")
-	cmd.Flags().Bool("raw", false, "Print output in JSON format")
+	cmd.Flags().Bool("raw", false, "Print raw Jira API response")
 
 	return &cmd
 }
@@ -60,6 +60,20 @@ func transitions(cmd *cobra.Command, args []string) {
 
 	client := api.DefaultClient(viper.GetBool("debug"))
 
+	if raw {
+		// Verbatim like "issue view --raw", so unavailable transitions stay in, marked by "isAvailable".
+		resp, err := func() (string, error) {
+			s := cmdutil.Info("Fetching available transitions...")
+			defer s.Stop()
+
+			return api.ProxyTransitionsRaw(client, key)
+		}()
+		cmdutil.ExitIfError(err)
+
+		fmt.Println(resp)
+		return
+	}
+
 	all, err := func() ([]*jira.Transition, error) {
 		s := cmdutil.Info("Fetching available transitions...")
 		defer s.Stop()
@@ -68,14 +82,7 @@ func transitions(cmd *cobra.Command, args []string) {
 	}()
 	cmdutil.ExitIfError(err)
 
-	available := filterAvailable(all, installation)
-
-	if raw {
-		cmdutil.OutputRawJSON(available)
-		return
-	}
-
-	if out := format(available, plain); out != "" {
+	if out := format(filterAvailable(all, installation), plain); out != "" {
 		fmt.Println(out)
 	}
 }

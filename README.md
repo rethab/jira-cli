@@ -518,7 +518,7 @@ Done -> Done
 # Tab separated for scripts
 $ jira issue transitions ISSUE-1 --plain
 
-# JSON
+# Raw Jira API response, including transitions that are not available
 $ jira issue transitions ISSUE-1 --raw
 ```
 
