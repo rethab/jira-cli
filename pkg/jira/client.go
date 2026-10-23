@@ -156,11 +156,14 @@ type Client struct {
 	transport http.RoundTripper
 	insecure  bool
 	server    string
-	login     string
-	authType  *AuthType
-	token     string
-	timeout   time.Duration
-	debug     bool
+	// browseServer is BrowseServer, kept to recognize links Jira reports on
+	// the site host rather than the API gateway.
+	browseServer string
+	login        string
+	authType     *AuthType
+	token        string
+	timeout      time.Duration
+	debug        bool
 	// mdOptions decide how markdown is converted: only Cloud understands
 	// smart links.
 	mdOptions []md.Option
@@ -172,11 +175,12 @@ type ClientFunc func(*Client)
 // NewClient instantiates new jira client.
 func NewClient(c Config, opts ...ClientFunc) *Client {
 	client := Client{
-		server:   strings.TrimSuffix(c.Server, "/"),
-		login:    c.Login,
-		token:    c.APIToken,
-		authType: c.AuthType,
-		debug:    c.Debug,
+		server:       strings.TrimSuffix(c.Server, "/"),
+		browseServer: strings.TrimSuffix(c.BrowseServer, "/"),
+		login:        c.Login,
+		token:        c.APIToken,
+		authType:     c.AuthType,
+		debug:        c.Debug,
 	}
 	// A hand-written config or JIRA_INSTALLATION may not use jira init's casing.
 	if strings.EqualFold(strings.TrimSpace(c.Installation), InstallationTypeCloud) {
@@ -355,7 +359,9 @@ func (c *Client) DeleteV2(ctx context.Context, path string, headers Header) (*ht
 	return c.request(ctx, http.MethodDelete, c.server+baseURLv2+path, nil, headers)
 }
 
-func (c *Client) request(ctx context.Context, method, endpoint string, body []byte, headers Header) (*http.Response, error) {
+// send performs the request without checking the response's content type, for
+// endpoints such as attachment downloads that legitimately return non-JSON.
+func (c *Client) send(ctx context.Context, method, endpoint string, body []byte, headers Header) (*http.Response, error) {
 	var (
 		req *http.Request
 		res *http.Response
@@ -399,6 +405,12 @@ func (c *Client) request(ctx context.Context, method, endpoint string, body []by
 	httpClient := &http.Client{Transport: c.transport}
 
 	res, err = httpClient.Do(req)
+
+	return res, err
+}
+
+func (c *Client) request(ctx context.Context, method, endpoint string, body []byte, headers Header) (*http.Response, error) {
+	res, err := c.send(ctx, method, endpoint, body, headers)
 	if err != nil {
 		return res, err
 	}

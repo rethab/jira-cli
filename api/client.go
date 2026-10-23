@@ -130,6 +130,25 @@ func ProxyGetIssue(c *jira.Client, key string, opts ...filter.Filter) (*jira.Iss
 	return iss, err
 }
 
+// ProxyGetIssueComments uses either a v2 or v3 version of the Jira GET
+// /issue/{key}/comment endpoint based on configured installation type, so
+// comment bodies are ADF on Cloud and wiki markup on Server/Data Center.
+// Defaults to v3 if installation type is not defined in the config.
+func ProxyGetIssueComments(c *jira.Client, key string) ([]jira.Comment, error) {
+	if viper.GetString("installation") == jira.InstallationTypeLocal {
+		return c.GetIssueCommentsV2(key)
+	}
+	return c.GetIssueComments(key)
+}
+
+// ProxyGetIssueComment is ProxyGetIssueComments for a single comment.
+func ProxyGetIssueComment(c *jira.Client, key, id string) (*jira.Comment, error) {
+	if viper.GetString("installation") == jira.InstallationTypeLocal {
+		return c.GetIssueCommentV2(key, id)
+	}
+	return c.GetIssueComment(key, id)
+}
+
 // ProxySearch uses either a v2 or v3 version of the Jira GET /search endpoint
 // to search for the relevant issues based on configured installation type.
 // Defaults to v3 if installation type is not defined in the config.

@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	helpText = `Add adds comment to an issue.`
+	helpText = `Add adds comment to an issue and prints the id of the new comment,
+which 'jira issue comment edit' and 'jira issue comment delete' take.`
 	examples = `$ jira issue comment add
 
 # Pass required parameters to skip prompt 
@@ -36,7 +37,11 @@ $ echo "Comment from stdin" | jira issue comment add ISSUE-1
 
 # Positional argument takes precedence over the template flag
 # The example below will add "comment from arg" as a comment
-$ jira issue comment add ISSUE-1 "comment from arg" --template /path/to/template.tmpl`
+$ jira issue comment add ISSUE-1 "comment from arg" --template /path/to/template.tmpl
+
+# Keep the id of the new comment to update it later
+$ id=$(jira issue comment add ISSUE-1 "Plan v1" --no-input | sed -n 's/.*(ID: \([0-9]*\)).*/\1/p')
+$ jira issue comment update ISSUE-1 "$id" "Plan v2" --no-input`
 )
 
 // NewCmdCommentAdd is a comment add command.
@@ -99,7 +104,7 @@ func add(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	err := func() error {
+	comment, err := func() (*jira.Comment, error) {
 		s := cmdutil.Info("Adding comment")
 		defer s.Stop()
 
@@ -109,7 +114,7 @@ func add(cmd *cobra.Command, args []string) {
 
 	server := viper.GetString("server")
 
-	cmdutil.Success("Comment added to issue %q", ac.params.issueKey)
+	cmdutil.Success("Comment added to issue %q (ID: %s)", ac.params.issueKey, comment.ID)
 	fmt.Printf("%s\n", cmdutil.GenerateServerBrowseURL(server, ac.params.issueKey))
 
 	if web, _ := cmd.Flags().GetBool("web"); web {
