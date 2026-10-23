@@ -355,7 +355,9 @@ func (c *Client) DeleteV2(ctx context.Context, path string, headers Header) (*ht
 	return c.request(ctx, http.MethodDelete, c.server+baseURLv2+path, nil, headers)
 }
 
-func (c *Client) request(ctx context.Context, method, endpoint string, body []byte, headers Header) (*http.Response, error) {
+// send performs the request without checking the response's content type, for
+// endpoints such as attachment downloads that legitimately return non-JSON.
+func (c *Client) send(ctx context.Context, method, endpoint string, body []byte, headers Header) (*http.Response, error) {
 	var (
 		req *http.Request
 		res *http.Response
@@ -399,6 +401,12 @@ func (c *Client) request(ctx context.Context, method, endpoint string, body []by
 	httpClient := &http.Client{Transport: c.transport}
 
 	res, err = httpClient.Do(req)
+
+	return res, err
+}
+
+func (c *Client) request(ctx context.Context, method, endpoint string, body []byte, headers Header) (*http.Response, error) {
+	res, err := c.send(ctx, method, endpoint, body, headers)
 	if err != nil {
 		return res, err
 	}

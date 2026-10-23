@@ -40,6 +40,10 @@ Features not available upstream:
 
 - **Worklog listing**: `jira issue worklog list ISSUE-1` lists an issue's worklogs, and `jira worklog list` shows what
   a user logged on a given day across all issues. See [Worklog](#worklog).
+- **Comment management**: `jira issue comment list`, `edit` and `delete` show the ids of an issue's comments, replace a
+  comment's body, and delete a comment. See [Comment](#comment).
+- **Attachments**: `jira issue attachment add`, `list` and `download` upload files to an issue, list its attachments, and
+  download them. See [Attachment](#attachment).
 - **Release creation**: `jira release create --name v1.0` creates a project version, optionally with a description,
   dates, and released/archived state. See [Releases](#releases).
   ([upstream #1002](https://github.com/ankitpokhrel/jira-cli/issues/1002))
@@ -655,6 +659,91 @@ example below, the body will be picked from positional argument instead of the t
 jira issue comment add ISSUE-42 "comment body positional" --template - <<'EOF'
 comment body template
 EOF
+```
+
+##### List
+The `list` command shows the comments of an issue, oldest first, including the id you need to edit or delete a comment.
+
+```sh
+$ jira issue comment list ISSUE-1
+
+# Plain, CSV or raw JSON output
+$ jira issue comment list ISSUE-1 --plain
+$ jira issue comment list ISSUE-1 --csv
+$ jira issue comment list ISSUE-1 --raw
+```
+
+##### Edit
+The `edit` command replaces the body of a comment. The body is written in Markdown and read like in `add`: from the
+positional argument, from `--template`, or from standard input. Without a body, your editor opens with the current body
+of the comment. Whether a comment is internal, and who it is visible to, is kept as it is.
+
+```sh
+# Edit the comment in your editor
+$ jira issue comment edit ISSUE-1 10042
+
+# Pass the new body to skip the prompt
+$ jira issue comment edit ISSUE-1 10042 "Fixed comment body"
+
+# Load the new body from a template file or from standard input
+$ jira issue comment edit ISSUE-1 10042 --template /path/to/template.tmpl
+$ echo "Comment from stdin" | jira issue comment edit ISSUE-1 10042
+```
+
+##### Delete
+The `delete` command deletes a comment after asking for confirmation. Pass `--no-input` to skip the confirmation.
+
+```sh
+$ jira issue comment delete ISSUE-1 10042
+
+# Skip the confirmation prompt
+$ jira issue comment delete ISSUE-1 10042 --no-input
+```
+
+#### Attachment
+The `attachment` command provides a list of sub-commands to manage issue attachments. It works on Jira Cloud as well as
+Jira Server and Data Center.
+
+##### Add
+The `add` command uploads one or more files to an issue and prints the id and name of each new attachment.
+
+```sh
+$ jira issue attachment add ISSUE-1 screenshot.png
+
+# Upload several files at once
+$ jira issue attachment add ISSUE-1 report.pdf logs/*.txt
+```
+
+##### List
+The `list` command shows the id, file name, size, author and date of the attachments of an issue.
+
+```sh
+$ jira issue attachment list ISSUE-1
+
+# Plain, CSV or raw JSON output
+$ jira issue attachment list ISSUE-1 --plain
+$ jira issue attachment list ISSUE-1 --csv
+$ jira issue attachment list ISSUE-1 --raw
+```
+
+##### Download
+The `download` command downloads the attachments of an issue. Without file names or ids it downloads all of them. It
+never overwrites an existing file silently: if a target file exists, the command fails before downloading anything,
+unless `--overwrite` is passed. If an issue has several attachments with the same name, the attachment id is added to
+the file names.
+
+```sh
+# Download all attachments to the current directory
+$ jira issue attachment download ISSUE-1
+
+# Download specific attachments by file name or id
+$ jira issue attachment download ISSUE-1 report.pdf 10042
+
+# Download to a different directory, which is created if needed
+$ jira issue attachment download ISSUE-1 -o /path/to/dir
+
+# Replace files that already exist
+$ jira issue attachment download ISSUE-1 --overwrite
 ```
 
 #### Worklog
