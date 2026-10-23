@@ -85,10 +85,12 @@ func (c *Client) AddIssueAttachment(key, filename string, content io.Reader) ([]
 //
 // The download link Jira reports differs by installation: Cloud points at
 // /rest/api/{v}/attachment/content/{id} on the site, and Server/Data Center at
-// /secure/attachment/{id}/{name} below its context path. Cloud links are
-// re-based onto the configured server so they also work when that is the
-// Atlassian API gateway (scoped tokens). Any other link must stay on the
-// configured host, so credentials are never sent elsewhere.
+// /secure/attachment/{id}/{name} below its base URL. Only the part from there
+// on is used, re-based onto the configured server, so credentials only ever go
+// to that server, whatever host the link names. That also makes Cloud links
+// work through the Atlassian API gateway (scoped tokens), and Server links when
+// Jira's base URL differs from the configured one. Cloud then redirects to its
+// media host, and net/http drops the Authorization header on that redirect.
 func (c *Client) DownloadAttachment(a Attachment, w io.Writer) error {
 	link, err := c.attachmentURL(a)
 	if err != nil {
@@ -119,20 +121,15 @@ func (c *Client) attachmentURL(a Attachment) (string, error) {
 		return "", fmt.Errorf("attachment %q has no usable download link", a.Filename)
 	}
 
-	if i := strings.Index(u.EscapedPath(), "/rest/api/"); i >= 0 {
-		link := c.server + u.EscapedPath()[i:]
-		if u.RawQuery != "" {
-			link += "?" + u.RawQuery
+	p := u.EscapedPath()
+	for _, marker := range []string{"/rest/api/", "/secure/attachment/"} {
+		if i := strings.Index(p, marker); i >= 0 {
+			link := c.server + p[i:]
+			if u.RawQuery != "" {
+				link += "?" + u.RawQuery
+			}
+			return link, nil
 		}
-		return link, nil
 	}
-
-	server, err := url.Parse(c.server)
-	if err != nil {
-		return "", err
-	}
-	if !strings.EqualFold(u.Host, server.Host) {
-		return "", fmt.Errorf("attachment %q is hosted on %q, not on the configured server", a.Filename, u.Host)
-	}
-	return a.Content, nil
+	return "", fmt.Errorf("attachment %q has an unrecognized download link %q", a.Filename, a.Content)
 }

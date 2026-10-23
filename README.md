@@ -44,7 +44,7 @@ Features not available upstream:
   comment's body, and delete a comment. See [Comment](#comment).
   ([upstream #975](https://github.com/ankitpokhrel/jira-cli/issues/975))
 - **Attachments**: `jira issue attachment add`, `list` and `download` upload files to an issue, list its attachments, and
-  download them. See [Attachment](#attachment).
+  download them. See [Attachment](#attachment). ([upstream #986](https://github.com/ankitpokhrel/jira-cli/pull/986))
 - **Release creation**: `jira release create --name v1.0` creates a project version, optionally with a description,
   dates, and released/archived state. See [Releases](#releases).
   ([upstream #1002](https://github.com/ankitpokhrel/jira-cli/issues/1002))
@@ -676,14 +676,15 @@ $ jira issue comment list ISSUE-1 --raw
 # Plain output without the header row is easy to parse in scripts: the first column is the comment id
 $ jira issue comment list ISSUE-1 --plain --no-headers | cut -f1
 
-# The raw output has the full author, eg: to find the latest comment of a user
-$ jira issue comment list ISSUE-1 --raw | jq -r 'map(select(.author.emailAddress == "me@example.com")) | last | .id'
+# The raw output has the full author, eg: to find the id of the latest comment of a user
+$ jira issue comment list ISSUE-1 --raw | jq -r 'map(select(.author.displayName == "Jane Doe")) | last | .id'
 ```
 
 ##### Edit
 The `edit` command replaces the body of a comment. The body is written in Markdown and read like in `add`: from the
-positional argument, from `--template`, or from standard input. Without a body, your editor opens with the current body
-of the comment. Whether a comment is internal, and who it is visible to, is kept as it is. `update` is an alias of `edit`.
+positional argument, from `--body`, from `--template`, or from standard input. Without a body, your editor opens with
+the current body of the comment. Whether a comment is internal, and who it is visible to, is kept as it is. `update` is
+an alias of `edit`.
 
 ```sh
 # Edit the comment in your editor

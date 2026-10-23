@@ -131,28 +131,26 @@ func TestDownloadAttachment(t *testing.T) {
 		assert.Equal(t, "cloud content", buf.String())
 	})
 
-	t.Run("server link is used as is", func(t *testing.T) {
+	t.Run("server link is re-based onto the configured server", func(t *testing.T) {
 		client := NewClient(Config{Server: server.URL + "/jira"}, WithTimeout(3*time.Second))
 
 		var buf bytes.Buffer
 		err := client.DownloadAttachment(Attachment{
 			Filename: "a b.txt",
-			Content:  server.URL + "/jira/secure/attachment/11/a%20b.txt",
+			Content:  "http://jira.internal.example.com/jira/secure/attachment/11/a%20b.txt",
 		}, &buf)
 		assert.NoError(t, err)
 		assert.Equal(t, "server content", buf.String())
 	})
 
-	t.Run("link on another host is refused", func(t *testing.T) {
+	t.Run("unrecognized link is refused", func(t *testing.T) {
 		client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
 
-		var buf bytes.Buffer
 		err := client.DownloadAttachment(Attachment{
 			Filename: "a.txt",
-			Content:  "https://evil.example.com/secure/attachment/11/a.txt",
-		}, &buf)
-		assert.Error(t, err)
-		assert.Empty(t, buf.String())
+			Content:  "https://evil.example.com/files/a.txt",
+		}, io.Discard)
+		assert.ErrorContains(t, err, "unrecognized download link")
 	})
 
 	t.Run("missing link", func(t *testing.T) {
@@ -174,4 +172,32 @@ func TestDownloadAttachment(t *testing.T) {
 		}, io.Discard)
 		assertUnexpectedResponse(t, err)
 	})
+}
+
+func TestDownloadAttachmentRedirectDropsCredentials(t *testing.T) {
+	media := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Empty(t, r.Header.Get("Authorization"))
+		_, _ = w.Write([]byte("media content"))
+	}))
+	defer media.Close()
+
+	// Go keeps credentials on redirects within the same host name, so the
+	// media server must be reached under a different one, as on Cloud.
+	mediaURL := strings.Replace(media.URL, "127.0.0.1", "localhost", 1)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.NotEmpty(t, r.Header.Get("Authorization"))
+		http.Redirect(w, r, mediaURL+"/file/10/binary", http.StatusSeeOther)
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL, Login: "user", APIToken: "secret"}, WithTimeout(3*time.Second))
+
+	var buf bytes.Buffer
+	err := client.DownloadAttachment(Attachment{
+		Filename: "a.txt",
+		Content:  "https://example.atlassian.net/rest/api/2/attachment/content/10",
+	}, &buf)
+	assert.NoError(t, err)
+	assert.Equal(t, "media content", buf.String())
 }

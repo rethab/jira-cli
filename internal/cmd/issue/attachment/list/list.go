@@ -47,7 +47,7 @@ func NewCmdAttachmentList() *cobra.Command {
 	cmd.Flags().Bool("plain", false, "Display output in plain mode")
 	cmd.Flags().Bool("csv", false, "Print output in CSV format")
 	cmd.Flags().Bool("no-headers", false, "Don't display table headers in plain mode. Works only with --plain")
-	cmd.Flags().Bool("raw", false, "Print raw Jira API response")
+	cmd.Flags().Bool("raw", false, "Print the attachments as raw JSON, as returned by the Jira API")
 
 	return &cmd
 }
@@ -87,6 +87,6 @@ func list(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	v := view.NewIssueAttachments(attachments, view.AttachmentDisplayFormat{Plain: plain, CSV: csv, NoHeaders: noHeaders})
+	v := view.NewIssueAttachments(attachments, view.ListDisplayFormat{Plain: plain, CSV: csv, NoHeaders: noHeaders})
 	cmdutil.ExitIfError(v.Render())
 }

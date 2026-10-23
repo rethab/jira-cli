@@ -52,7 +52,7 @@ type commentPage struct {
 // paginated GET /issue/{key}/comment endpoint. The comment field embedded in
 // the issue resource is capped, so it can't be used to list them all.
 func (c *Client) GetIssueComments(key string) ([]Comment, error) {
-	var comments []Comment
+	comments := []Comment{}
 
 	for {
 		path := fmt.Sprintf("/issue/%s/comment?startAt=%d&maxResults=%d", key, len(comments), commentPageSize)

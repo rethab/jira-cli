@@ -1,11 +1,7 @@
 package view
 
 import (
-	"bytes"
 	"fmt"
-	"io"
-	"os"
-	"text/tabwriter"
 
 	"github.com/rethab/jira-cli/pkg/jira"
 	"github.com/rethab/jira-cli/pkg/tui"
@@ -13,63 +9,20 @@ import (
 
 const bytesPerUnit = 1024
 
-// AttachmentDisplayFormat controls how an attachment view is rendered.
-type AttachmentDisplayFormat struct {
-	Plain     bool
-	CSV       bool
-	NoHeaders bool
-}
-
-// IssueAttachmentsOption is a functional option to configure IssueAttachments.
-type IssueAttachmentsOption func(*IssueAttachments)
-
 // IssueAttachments is a view of a single issue's attachments.
 type IssueAttachments struct {
-	Data    []jira.Attachment
-	Display AttachmentDisplayFormat
-	writer  io.Writer
-	buf     *bytes.Buffer
+	Data []jira.Attachment
+	listView
 }
 
 // NewIssueAttachments constructs a view for a single issue's attachments.
-func NewIssueAttachments(data []jira.Attachment, display AttachmentDisplayFormat, opts ...IssueAttachmentsOption) *IssueAttachments {
-	a := IssueAttachments{
-		Data:    data,
-		Display: display,
-		buf:     new(bytes.Buffer),
-	}
-	a.writer = tabwriter.NewWriter(a.buf, 0, tabWidth, 1, '\t', 0)
-
-	for _, opt := range opts {
-		opt(&a)
-	}
-	return &a
-}
-
-// WithIssueAttachmentsWriter sets the writer used for the pager-backed render.
-func WithIssueAttachmentsWriter(out io.Writer) IssueAttachmentsOption {
-	return func(a *IssueAttachments) {
-		a.writer = out
-	}
+func NewIssueAttachments(data []jira.Attachment, display ListDisplayFormat, opts ...ListOption) *IssueAttachments {
+	return &IssueAttachments{Data: data, listView: newListView(display, opts)}
 }
 
 // Render renders the view.
 func (a *IssueAttachments) Render() error {
-	data := a.data()
-
-	if a.Display.CSV {
-		return renderCSV(os.Stdout, data)
-	}
-	if a.Display.Plain {
-		if a.Display.NoHeaders {
-			data = data[1:]
-		}
-		return renderPlain(tabwriter.NewWriter(os.Stdout, 0, tabWidth, 1, '\t', 0), data, "\t")
-	}
-	if err := renderPlain(a.writer, data, "\t"); err != nil {
-		return err
-	}
-	return tui.PagerOut(a.buf.String())
+	return a.render(a.data())
 }
 
 func (a *IssueAttachments) data() tui.TableData {

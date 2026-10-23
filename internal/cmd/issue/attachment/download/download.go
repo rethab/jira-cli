@@ -34,7 +34,8 @@ $ jira issue attachment download ISSUE-1 -o /path/to/dir
 # Replace files that already exist
 $ jira issue attachment download ISSUE-1 --overwrite`
 
-	dirPerm = 0o755
+	dirPerm  = 0o755
+	filePerm = 0o644
 )
 
 // NewCmdAttachmentDownload is an attachment download command.
@@ -118,32 +119,45 @@ func download(cmd *cobra.Command, args []string) {
 	}
 }
 
-// save streams the attachment to target. Without overwrite the file is
-// created exclusively, so a file that appeared since the existence check
-// still isn't clobbered.
-func save(client *jira.Client, a jira.Attachment, target string, overwrite bool) (err error) {
-	flags := os.O_WRONLY | os.O_CREATE | os.O_EXCL
-	if overwrite {
-		flags = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+// save downloads into a temporary file next to target and renames it into
+// place only once the download succeeded, so a failed download never leaves a
+// partial file or destroys the file --overwrite was meant to replace. Without
+// overwrite, target is claimed with O_EXCL first, so a file that appeared since
+// the existence check isn't replaced either.
+func save(client *jira.Client, a jira.Attachment, target string, overwrite bool) error {
+	if !overwrite {
+		f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, filePerm)
+		if err != nil {
+			return err
+		}
+		_ = f.Close()
 	}
 
-	const perm = 0o644
+	err := saveViaTemp(client, a, target)
+	if err != nil && !overwrite {
+		_ = os.Remove(target)
+	}
+	return err
+}
 
-	f, err := os.OpenFile(target, flags, perm)
+func saveViaTemp(client *jira.Client, a jira.Attachment, target string) error {
+	tmp, err := os.CreateTemp(filepath.Dir(target), "."+filepath.Base(target)+".*.part")
 	if err != nil {
 		return err
 	}
+	defer func() { _ = os.Remove(tmp.Name()) }()
 
-	defer func() {
-		if cerr := f.Close(); err == nil {
-			err = cerr
-		}
-		if err != nil {
-			_ = os.Remove(target)
-		}
-	}()
-
-	return client.DownloadAttachment(a, f)
+	if err := client.DownloadAttachment(a, tmp); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmp.Name(), filePerm); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), target)
 }
 
 // selectAttachments returns the attachments matching refs, each of which is
@@ -184,22 +198,38 @@ func selectAttachments(all []jira.Attachment, refs []string) ([]jira.Attachment,
 // targetNames returns the local file name for each attachment. Names that
 // would collide get the attachment id added, so that downloading all
 // attachments of an issue never makes one overwrite another.
+//
+// Names are compared case-insensitively, as the default file systems on macOS
+// and Windows are, and a suffixed name must not clash with another attachment
+// that is already called that.
 func targetNames(attachments []jira.Attachment) []string {
 	base := make([]string, len(attachments))
 	count := make(map[string]int)
 
 	for i, a := range attachments {
 		base[i] = safeName(a)
-		count[base[i]]++
+		count[strings.ToLower(base[i])]++
 	}
 
 	names := make([]string, len(attachments))
-	for i, a := range attachments {
-		names[i] = base[i]
-		if count[base[i]] > 1 {
-			ext := filepath.Ext(base[i])
-			names[i] = strings.TrimSuffix(base[i], ext) + "-" + a.ID + ext
+	taken := make(map[string]bool)
+	for i := range attachments {
+		if count[strings.ToLower(base[i])] == 1 {
+			names[i] = base[i]
+			taken[strings.ToLower(names[i])] = true
 		}
+	}
+	for i, a := range attachments {
+		if names[i] != "" {
+			continue
+		}
+		ext := filepath.Ext(base[i])
+		stem := strings.TrimSuffix(base[i], ext) + "-" + a.ID
+		names[i] = stem + ext
+		for n := 2; taken[strings.ToLower(names[i])]; n++ {
+			names[i] = fmt.Sprintf("%s-%d%s", stem, n, ext)
+		}
+		taken[strings.ToLower(names[i])] = true
 	}
 	return names
 }

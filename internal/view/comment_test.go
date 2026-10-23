@@ -29,7 +29,7 @@ func TestIssueCommentsRender(t *testing.T) {
 		},
 	}
 
-	c := NewIssueComments(data, CommentDisplayFormat{}, WithIssueCommentsWriter(&b))
+	c := NewIssueComments(data, ListDisplayFormat{}, WithListWriter(&b))
 	assert.NoError(t, c.Render())
 
 	expected := `ID	AUTHOR	CREATED	UPDATED	BODY
@@ -47,7 +47,7 @@ func TestIssueAttachmentsRender(t *testing.T) {
 		{ID: "11", Filename: "b.png", Size: 5 * 1024 * 1024, Author: jira.User{Name: "person.b"}, Created: "2026-01-15T09:00:00.000+0000"},
 	}
 
-	a := NewIssueAttachments(data, AttachmentDisplayFormat{}, WithIssueAttachmentsWriter(&b))
+	a := NewIssueAttachments(data, ListDisplayFormat{}, WithListWriter(&b))
 	assert.NoError(t, a.Render())
 
 	expected := `ID	FILENAME	SIZE	AUTHOR	CREATED
