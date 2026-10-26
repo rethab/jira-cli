@@ -387,6 +387,7 @@ type editParams struct {
 	parentIssueKey   string
 	summary          string
 	body             string
+	template         string
 	priority         string
 	assignee         string
 	labels           []string
@@ -399,6 +400,10 @@ type editParams struct {
 	allowImageLoss   bool
 	noInput          bool
 	debug            bool
+}
+
+func loadTemplate(params *editParams) error {
+	return nil
 }
 
 func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *editParams {
