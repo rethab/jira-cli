@@ -1,6 +1,8 @@
 package edit
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -329,4 +331,99 @@ func TestApplyOriginalEstimateAnswer(t *testing.T) {
 			assert.Equal(t, tc.want, params.originalEstimate)
 		})
 	}
+}
+
+func TestLoadTemplate(t *testing.T) {
+	writeTemplate := func(t *testing.T, content string) string {
+		t.Helper()
+		path := filepath.Join(t.TempDir(), "body.tmpl")
+		assert.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+		return path
+	}
+
+	t.Run("body is read from the template file", func(t *testing.T) {
+		params := &editParams{template: writeTemplate(t, "From template\n")}
+
+		assert.NoError(t, loadTemplate(params))
+		assert.Equal(t, "From template\n", params.body)
+	})
+
+	t.Run("body flag takes precedence over the template", func(t *testing.T) {
+		params := &editParams{body: "From flag", template: writeTemplate(t, "From template")}
+
+		assert.NoError(t, loadTemplate(params))
+		assert.Equal(t, "From flag", params.body)
+	})
+
+	t.Run("no template leaves the body alone", func(t *testing.T) {
+		params := &editParams{}
+
+		assert.NoError(t, loadTemplate(params))
+		assert.Empty(t, params.body)
+	})
+
+	t.Run("dash reads standard input", func(t *testing.T) {
+		r, w, err := os.Pipe()
+		assert.NoError(t, err)
+		_, err = w.WriteString("From stdin")
+		assert.NoError(t, err)
+		assert.NoError(t, w.Close())
+
+		stdin := os.Stdin
+		os.Stdin = r
+		t.Cleanup(func() { os.Stdin = stdin })
+
+		params := &editParams{template: "-"}
+
+		assert.NoError(t, loadTemplate(params))
+		assert.Equal(t, "From stdin", params.body)
+	})
+
+	t.Run("unreadable template is an error", func(t *testing.T) {
+		params := &editParams{template: filepath.Join(t.TempDir(), "missing.tmpl")}
+
+		err := loadTemplate(params)
+
+		assert.ErrorContains(t, err, "missing.tmpl")
+		assert.Empty(t, params.body)
+	})
+}
+
+func TestTemplateBodyIsCheckedForImageLoss(t *testing.T) {
+	issue := &jira.Issue{}
+	issue.Fields.Description = &adf.ADF{
+		Version: 1,
+		DocType: "doc",
+		Content: []*adf.Node{
+			{NodeType: adf.NodeMediaSingle, Content: []*adf.Node{{NodeType: adf.NodeMedia}}},
+		},
+	}
+	path := filepath.Join(t.TempDir(), "body.tmpl")
+	assert.NoError(t, os.WriteFile(path, []byte("New description"), 0o600))
+
+	t.Run("refused without the override", func(t *testing.T) {
+		params := &editParams{issueKey: "TEST-1", template: path}
+
+		assert.NoError(t, loadTemplate(params))
+		assert.ErrorContains(t, checkImageLoss(issue, params), "--allow-image-loss")
+	})
+
+	t.Run("allowed with the override", func(t *testing.T) {
+		params := &editParams{issueKey: "TEST-1", template: path, allowImageLoss: true}
+
+		assert.NoError(t, loadTemplate(params))
+		assert.NoError(t, checkImageLoss(issue, params))
+	})
+}
+
+func TestQuestionsSkipDescriptionEditorWhenTemplateProvidedBody(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "body.tmpl")
+	assert.NoError(t, os.WriteFile(path, []byte("New description"), 0o600))
+
+	params := &editParams{summary: "kept", template: path}
+	assert.NoError(t, loadTemplate(params))
+
+	ec := editCmd{params: params}
+
+	assert.Empty(t, ec.questions(&jira.Issue{}, ""))
 }
