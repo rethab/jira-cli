@@ -35,6 +35,12 @@ $ jira issue edit ISSUE-1 -e"1d 4h" --no-input
 # so the command refuses unless you explicitly accept the loss
 $ jira issue edit ISSUE-1 -b"New description" --allow-image-loss
 
+# Load the new description from a template file
+$ jira issue edit ISSUE-1 --template /path/to/template.tmpl
+
+# Use minus (-) to read the template from standard input
+$ cat template.tmpl | jira issue edit ISSUE-1 --template -
+
 # Use pipe to read the description body directly from standard input
 $ echo "Description from stdin" | jira issue edit ISSUE-1 -s"New updated summary"  --no-input
 
@@ -70,6 +76,8 @@ func edit(cmd *cobra.Command, args []string) {
 	project := viper.GetString("project.key")
 
 	params := parseArgsAndFlags(cmd.Flags(), args, project)
+	cmdutil.ExitIfError(loadTemplate(params))
+
 	client := api.DefaultClient(params.debug)
 	ec := editCmd{
 		client: client,
@@ -402,7 +410,17 @@ type editParams struct {
 	debug            bool
 }
 
+// An explicit --body wins, and the template is resolved before the issue is fetched
+// so that checkImageLoss and the prompts see the body it provides.
 func loadTemplate(params *editParams) error {
+	if params.body != "" || params.template == "" {
+		return nil
+	}
+	b, err := cmdutil.ReadFile(params.template)
+	if err != nil {
+		return fmt.Errorf("unable to read template: %w", err)
+	}
+	params.body = string(b)
 	return nil
 }
 
@@ -414,6 +432,9 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 	cmdutil.ExitIfError(err)
 
 	body, err := flags.GetString("body")
+	cmdutil.ExitIfError(err)
+
+	template, err := flags.GetString("template")
 	cmdutil.ExitIfError(err)
 
 	priority, err := flags.GetString("priority")
@@ -449,6 +470,11 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 	noInput, err := flags.GetBool("no-input")
 	cmdutil.ExitIfError(err)
 
+	// Reading the template consumes stdin, so there is nothing left to prompt on.
+	if template == "-" {
+		noInput = true
+	}
+
 	debug := viper.GetBool("debug")
 
 	return &editParams{
@@ -456,6 +482,7 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 		parentIssueKey:   parentIssueKey,
 		summary:          summary,
 		body:             body,
+		template:         template,
 		priority:         priority,
 		assignee:         assignee,
 		labels:           labels,
@@ -549,6 +576,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("parent", "P", "", `Link to a parent key`)
 	cmd.Flags().StringP("summary", "s", "", "Edit summary or title")
 	cmd.Flags().StringP("body", "b", "", "Edit description")
+	cmd.Flags().StringP("template", "T", "", "Path to a file to read the description from, or - for standard input")
 	cmd.Flags().StringP("priority", "y", "", "Edit priority")
 	cmd.Flags().StringP("assignee", "a", "", "Edit assignee (email or display name)")
 	cmd.Flags().StringArrayP("label", "l", []string{}, "Append labels")
