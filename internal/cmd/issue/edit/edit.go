@@ -110,8 +110,9 @@ func edit(cmd *cobra.Command, args []string) {
 		getAnswers(params, issue)
 	}
 
-	// Use stdin only if nothing is passed to --body
-	if params.body == "" && cmdutil.StdinHasData() {
+	// Use stdin only if nothing is passed to --body or --template; --template - has
+	// already consumed and closed it, so reading again would fail.
+	if params.body == "" && params.template == "" && cmdutil.StdinHasData() {
 		b, err := cmdutil.ReadFile("-")
 		if err != nil {
 			cmdutil.Failed("Error: %s", err)
@@ -471,7 +472,8 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 	cmdutil.ExitIfError(err)
 
 	// Reading the template consumes stdin, so there is nothing left to prompt on.
-	if template == "-" {
+	// An explicit --body wins over the template, in which case stdin is left alone.
+	if template == "-" && body == "" {
 		noInput = true
 	}
 
