@@ -74,6 +74,8 @@ Features not available upstream:
 - **Original estimate on edit**: `jira issue edit ISSUE-1 --original-estimate 2h` (`-e`) sets the original estimate of
   an existing issue, leaving the remaining estimate to Jira. See [Edit](#edit).
   ([upstream #801](https://github.com/ankitpokhrel/jira-cli/pull/801))
+- **Description from a template on edit**: `jira issue edit ISSUE-1 --template /path/to/file` (`-T`) reads the new
+  description from a file, or from standard input with `-`, like `jira issue create`. See [Edit](#edit).
 - **Listing transitions**: `jira issue transitions ISSUE-1` prints the transitions an issue can take, with the status
   each one leads to, without moving the issue. See [Move/Transition](#movetransition).
 - **Verifiable builds**: every release ships SLSA provenance and an SBOM, and every merge to `main` publishes a snapshot
@@ -450,6 +452,12 @@ $ jira issue edit ISSUE-1 -b"New description" --allow-image-loss
 
 # Set the original estimate in Jira's duration format; the remaining estimate is left to Jira
 $ jira issue edit ISSUE-1 --original-estimate "1d 4h" --no-input
+
+# Load the new description from a template file
+$ jira issue edit ISSUE-1 --template /path/to/template.tmpl
+
+# Use minus (-) to read the template from standard input
+$ cat template.tmpl | jira issue edit ISSUE-1 --template -
 
 # In the interactive prompt, "OriginalEstimate" can be picked under "What would you like to add?"
 
