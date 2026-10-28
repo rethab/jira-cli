@@ -119,3 +119,44 @@ func TestEdit(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "notifyUsers=false", gotRawQuery, "notifyUsers=false should only be set when SkipNotify is requested")
 }
+
+func TestEditCascadingSelectCustomField(t *testing.T) {
+	component := IssueTypeField{Name: "Platform Component", Key: "customfield_14694"}
+	component.Schema.DataType = customFieldFormatOptionWithChild
+
+	cases := []struct {
+		name  string
+		value string
+		set   string
+	}{
+		{
+			name:  "parent and child",
+			value: "Pipelines/Scripts -> Environment Management",
+			set:   `{"value":"Pipelines/Scripts","child":{"value":"Environment Management"}}`,
+		},
+		{name: "parent only", value: "Pipelines/Scripts", set: `{"value":"Pipelines/Scripts"}`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			expectedBody := `{"update":{"customfield_14694":[{"set":` + tc.set + `}]},"fields":{"parent":{}}}`
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				actualBody := new(strings.Builder)
+				_, _ = io.Copy(actualBody, r.Body)
+
+				assert.JSONEq(t, expectedBody, actualBody.String())
+
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			defer server.Close()
+
+			client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+			req := &EditRequest{CustomFields: map[string]string{"customfield_14694": tc.value}}
+			req.WithCustomFields([]IssueTypeField{component})
+
+			assert.NoError(t, client.Edit("TEST-1", req))
+		})
+	}
+}

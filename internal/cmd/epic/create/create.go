@@ -58,6 +58,9 @@ func create(cmd *cobra.Command, _ []string) {
 		params: params,
 	}
 
+	customFields, err := cmdcommon.ResolveCustomFields(client, params.CustomFields)
+	cmdutil.ExitIfError(err)
+
 	if cc.isNonInteractive() || cc.params.NoInput || tui.IsDumbTerminal() {
 		cc.params.NoInput = true
 
@@ -117,10 +120,7 @@ func create(cmd *cobra.Command, _ []string) {
 		}
 		cr.ForProjectType(projectType)
 		cr.ForInstallationType(installation)
-		if configuredCustomFields, err := cmdcommon.GetConfiguredCustomFields(); err == nil {
-			cmdcommon.ValidateCustomFields(cr.CustomFields, configuredCustomFields)
-			cr.WithCustomFields(configuredCustomFields)
-		}
+		cr.WithCustomFields(customFields)
 
 		resp, err := client.CreateV2(&cr)
 		if err != nil {

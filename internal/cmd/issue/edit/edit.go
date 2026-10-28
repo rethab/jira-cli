@@ -84,6 +84,9 @@ func edit(cmd *cobra.Command, args []string) {
 		params: params,
 	}
 
+	customFields, err := cmdcommon.ResolveCustomFields(client, params.customFields)
+	cmdutil.ExitIfError(err)
+
 	issue, err := func() (*jira.Issue, error) {
 		s := cmdutil.Info(fmt.Sprintf("Fetching issue %s...", params.issueKey))
 		defer s.Stop()
@@ -127,6 +130,7 @@ func edit(cmd *cobra.Command, args []string) {
 	cmdutil.ExitIfError(checkImageLoss(issue, params))
 
 	edr := buildEditRequest(client, project, issue, params)
+	edr.WithCustomFields(customFields)
 
 	err = func() error {
 		s := cmdutil.Info("Updating an issue...")
@@ -229,10 +233,6 @@ func buildEditRequest(client *jira.Client, project string, issue *jira.Issue, pa
 		OriginalEstimate: params.originalEstimate,
 		CustomFields:     params.customFields,
 		SkipNotify:       params.skipNotify,
-	}
-	if configuredCustomFields, err := cmdcommon.GetConfiguredCustomFields(); err == nil {
-		cmdcommon.ValidateCustomFields(edr.CustomFields, configuredCustomFields)
-		edr.WithCustomFields(configuredCustomFields)
 	}
 
 	return edr

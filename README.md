@@ -78,6 +78,15 @@ Features not available upstream:
   description with the contents of a file, or of standard input with `-`, without opening the editor. See [Edit](#edit).
 - **Listing transitions**: `jira issue transitions ISSUE-1` prints the transitions an issue can take, with the status
   each one leads to, without moving the issue. See [Move/Transition](#movetransition).
+- **Cascading selects in `--custom`**: `--custom platform-component="Parent->Child"` sets a cascading select on
+  `jira issue create`, `jira issue edit` and `jira epic create`; without `->` only the parent is set. See
+  [Create](#create). ([upstream #949](https://github.com/ankitpokhrel/jira-cli/issues/949))
+- **Custom fields by id, and strict `--custom` keys**: `--custom customfield_12345=...` selects a field by its id. A key
+  that isn't in the config is looked up on the server, so fields created after `jira init` work without re-running it.
+  A key that matches no field at all is now an error instead of a warning. See [Create](#create).
+- **Listing the fields of a create screen**: `jira issue fields -t Problem [--required] [--plain]` lists the fields an
+  issue type needs on create, with their ids, types, and allowed values as `--custom` takes them. See
+  [Create](#create).
 - **Verifiable builds**: every release ships SLSA provenance and an SBOM, and every merge to `main` publishes a snapshot
   Homebrew cask and Docker image. See [Installation](#installation).
 
@@ -406,6 +415,38 @@ $  jira issue create -tStory -s"Epic during creation" -PEPIC-42
 
 You can use a `--custom` flag to set custom fields while creating the issue. See [this post](https://github.com/ankitpokhrel/jira-cli/discussions/346) for more details.
 
+A field is addressed by its name in lowercase with dashes (`Story Points` becomes `story-points`) or by its id
+(`customfield_10016`); the id is also the way to tell apart two fields with the same name. Fields that are not in the
+config, e.g. because they were created after `jira init`, are looked up on the server. A key that matches no field
+makes the command fail before anything is asked or sent.
+
+```sh
+$ jira issue create -tStory -s"With custom fields" --custom story-points=3 --custom customfield_10042="Some value"
+
+# Multi-select fields take a comma separated list
+$ jira issue create -tProblem -s"Multi select" --custom environments-affected="Development,Staging"
+
+# Cascading selects take "Parent->Child"; without "->" only the parent is set
+$ jira issue create -tProblem -s"Cascading select" --custom platform-component="Pipelines/Scripts->Environment Management"
+```
+
+To find out which fields an issue type needs, and what values they accept, use `jira issue fields`. It lists the fields
+of the create screen with their id, type, and whether they are required, followed by the allowed values written the way
+`--custom` takes them. It accepts the same `-p/--project` and `-t/--type` as `create`.
+
+```sh
+$ jira issue fields -t Problem
+Platform Component (customfield_14694): option-with-child, required
+  Pipelines/Scripts->Environment Management
+  Pipelines/Scripts->Release
+
+# Only the required fields
+$ jira issue fields -p PROJ -t Problem --required
+
+# Tab separated ID, NAME, TYPE, REQUIRED and VALUE, one row per allowed value
+$ jira issue fields -t Problem --plain
+```
+
 The command supports both [GitHub-flavored](https://github.github.com/gfm/)
 and [Jira-flavored](https://jira.atlassian.com/secure/WikiRendererHelpAction.jspa?section=all) Markdown for writing
 description. You can load pre-defined templates using `--template` flag.
@@ -460,6 +501,10 @@ $ jira issue edit ISSUE-1 --template /path/to/template.tmpl
 $ cat template.tmpl | jira issue edit ISSUE-1 --template -
 
 # In the interactive prompt, "OriginalEstimate" can be picked under "What would you like to add?"
+
+# Set custom fields, by name or by id; cascading selects take "Parent->Child"
+# See Create for how the fields are matched and `jira issue fields` for the values a field accepts
+$ jira issue edit ISSUE-1 --custom story-points=5 --custom platform-component="Pipelines/Scripts->Release"
 
 # Use minus (-) to remove label, component or fixVersion
 # For instance, to edit issue to

@@ -1,6 +1,7 @@
 package cmdcommon
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -259,26 +260,71 @@ func GetConfiguredCustomFields() ([]jira.IssueTypeField, error) {
 	return configuredFields, nil
 }
 
-// ValidateCustomFields validates custom fields.
-// TODO: Fail with error instead of warning in future release.
-func ValidateCustomFields(fields map[string]string, configuredFields []jira.IssueTypeField) {
-	if len(fields) == 0 {
-		return
+// ResolveCustomFields returns the fields the keys passed to `--custom` refer to. Keys are
+// matched against the configured fields first; only if some match nothing, the fields are
+// looked up on the server once, which covers fields created after `jira init`. Keys that
+// still match nothing are an error, since carrying on would silently drop them.
+//
+// Call this before prompting or showing a spinner, so a bad key fails the command up front.
+func ResolveCustomFields(client *jira.Client, fields map[string]string) ([]jira.IssueTypeField, error) {
+	// Ignoring a malformed config keeps the lookup path available for the keys.
+	configured, _ := GetConfiguredCustomFields()
+
+	unmatched := unmatchedKeys(fields, configured)
+	if len(unmatched) == 0 {
+		return configured, nil
 	}
 
-	invalidCustomFields := make([]string, 0, len(fields))
-	for key := range fields {
-		if !slices.ContainsFunc(configuredFields, func(c jira.IssueTypeField) bool { return jira.CustomFieldMatches(key, c) }) {
-			invalidCustomFields = append(invalidCustomFields, key)
+	all, err := client.GetField()
+	if err != nil {
+		return nil, fmt.Errorf("looking up custom fields %s: %w", strings.Join(unmatched, ", "), err)
+	}
+
+	for _, f := range all {
+		if !f.Custom {
+			continue
 		}
+
+		looked := jira.IssueTypeField{Name: f.Name, Key: f.ID}
+		looked.Schema.DataType = f.Schema.DataType
+		looked.Schema.Items = f.Schema.Items
+
+		if !slices.ContainsFunc(unmatched, func(k string) bool { return jira.CustomFieldMatches(k, looked) }) {
+			continue
+		}
+
+		// A field asked for only by id must not also pick up a name key meant for a
+		// configured field of the same name, or that field's value could land here too.
+		byName := slices.ContainsFunc(unmatched, func(k string) bool {
+			return jira.CustomFieldMatches(k, jira.IssueTypeField{Name: f.Name})
+		})
+		if !byName {
+			looked.Name = ""
+		}
+		configured = append(configured, looked)
 	}
 
-	if len(invalidCustomFields) > 0 {
-		cmdutil.Warn(`
-Some custom fields are not configured and will be ignored. This will fail with error in the future release.
-Please make sure that the passed custom fields are valid and configured accordingly in the config file.
-Invalid custom fields used in the command: %s`,
-			strings.Join(invalidCustomFields, ", "),
+	if unknown := unmatchedKeys(fields, configured); len(unknown) > 0 {
+		return nil, fmt.Errorf(
+			"unknown custom fields: %s\n"+
+				"Run `jira issue fields -t TYPE` to list the fields of an issue type, "+
+				"or pass the field id as `customfield_NNNNN`",
+			strings.Join(unknown, ", "),
 		)
 	}
+
+	return configured, nil
+}
+
+func unmatchedKeys(fields map[string]string, configured []jira.IssueTypeField) []string {
+	var out []string
+
+	for key := range fields {
+		if !slices.ContainsFunc(configured, func(c jira.IssueTypeField) bool { return jira.CustomFieldMatches(key, c) }) {
+			out = append(out, key)
+		}
+	}
+	slices.Sort(out)
+
+	return out
 }

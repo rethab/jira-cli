@@ -247,9 +247,18 @@ func assigneeField(assignee, installationType string) any {
 	}{AccountID: id}
 }
 
-// CustomFieldMatches reports whether a key passed on the command line refers to the configured field.
+// CustomFieldMatches reports whether a key passed on the command line refers to the configured field,
+// either by its name as a dash-separated identifier or by its field id.
 // Create, edit, and validation must all go through this so they agree on which keys are applied.
 func CustomFieldMatches(key string, configured IssueTypeField) bool {
+	if key == "" {
+		return false
+	}
+
+	if strings.EqualFold(key, configured.Key) {
+		return true
+	}
+
 	identifier := strings.ReplaceAll(strings.ToLower(strings.TrimSpace(configured.Name)), " ", "-")
 	return identifier == strings.ToLower(key)
 }
@@ -270,6 +279,8 @@ func constructCustomFields(fields map[string]string, configuredFields []IssueTyp
 			switch configured.Schema.DataType {
 			case customFieldFormatOption:
 				data.Fields.M.customFields[configured.Key] = customFieldTypeOption{Value: val}
+			case customFieldFormatOptionWithChild:
+				data.Fields.M.customFields[configured.Key] = parseCascadingValue(val)
 			case customFieldFormatProject:
 				data.Fields.M.customFields[configured.Key] = customFieldTypeProject{Value: val}
 			case customFieldFormatArray:
