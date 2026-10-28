@@ -9,14 +9,14 @@ import (
 	"github.com/rethab/jira-cli/pkg/tui"
 )
 
-// ListDisplayFormat controls how the comment and attachment lists are rendered.
+// ListDisplayFormat controls how the comment, attachment and worklog lists are rendered.
 type ListDisplayFormat struct {
 	Plain     bool
 	CSV       bool
 	NoHeaders bool
 }
 
-// ListOption is a functional option to configure the comment and attachment lists.
+// ListOption is a functional option to configure the comment, attachment and worklog lists.
 type ListOption func(*listView)
 
 // WithListWriter sets the writer used for the pager-backed render.

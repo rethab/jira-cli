@@ -11,18 +11,26 @@ import (
 )
 
 const (
-	helpText = `List lists worklogs of an issue.
+	helpText = `List lists worklogs of an issue, along with their ids.
 
 Unlike the worklog field embedded in an issue, this command paginates properly,
 so it also works for issues with more than 20 worklogs. Entries are shown
-newest first by default.`
+newest first by default.
+
+Use the id to edit or delete a worklog.`
 	examples = `$ jira issue worklog list ISSUE-1
 
 # Show at most 10 entries
 $ jira issue worklog list ISSUE-1 --limit 10
 
 # Page through the oldest entries instead, 20 at a time starting from the 40th
-$ jira issue worklog list ISSUE-1 --oldest-first --start 40 --limit 20`
+$ jira issue worklog list ISSUE-1 --oldest-first --start 40 --limit 20
+
+# Plain mode without headers, eg: for scripts
+$ jira issue worklog list ISSUE-1 --plain --no-headers
+
+# Print the raw API response
+$ jira issue worklog list ISSUE-1 --raw`
 
 	defaultLimit = 50
 )
@@ -34,6 +42,7 @@ func NewCmdWorklogList() *cobra.Command {
 		Short:   "List worklogs of an issue",
 		Long:    helpText,
 		Example: examples,
+		Aliases: []string{"ls"},
 		Args:    cobra.ExactArgs(1),
 		Annotations: map[string]string{
 			"help:args": "ISSUE-KEY\tIssue key of the source issue, eg: ISSUE-1",
@@ -48,6 +57,8 @@ func NewCmdWorklogList() *cobra.Command {
 	cmd.Flags().Uint("start", 0, "Index to start from; only used together with --oldest-first")
 	cmd.Flags().Bool("plain", false, "Display output in plain mode")
 	cmd.Flags().Bool("csv", false, "Print output in CSV format")
+	cmd.Flags().Bool("no-headers", false, "Don't display table headers in plain mode. Works only with --plain")
+	cmd.Flags().Bool("raw", false, "Print the worklogs as raw JSON, as returned by the Jira API")
 
 	return &cmd
 }
@@ -74,6 +85,12 @@ func list(cmd *cobra.Command, args []string) {
 	csv, err := cmd.Flags().GetBool("csv")
 	cmdutil.ExitIfError(err)
 
+	noHeaders, err := cmd.Flags().GetBool("no-headers")
+	cmdutil.ExitIfError(err)
+
+	raw, err := cmd.Flags().GetBool("raw")
+	cmdutil.ExitIfError(err)
+
 	debug := viper.GetBool("debug")
 	client := api.DefaultClient(debug)
 
@@ -93,12 +110,20 @@ func list(cmd *cobra.Command, args []string) {
 	}()
 	cmdutil.ExitIfError(err)
 
+	if raw {
+		if worklogs == nil {
+			worklogs = []jira.Worklog{}
+		}
+		cmdutil.OutputRawJSON(worklogs)
+		return
+	}
+
 	if len(worklogs) == 0 {
 		cmdutil.Failed("No worklogs found for issue %q", issueKey)
 		return
 	}
 
-	v := view.NewIssueWorklogs(worklogs, view.WorklogDisplayFormat{Plain: plain, CSV: csv})
+	v := view.NewIssueWorklogs(worklogs, view.ListDisplayFormat{Plain: plain, CSV: csv, NoHeaders: noHeaders})
 	cmdutil.ExitIfError(v.Render())
 }
 

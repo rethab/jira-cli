@@ -1,12 +1,8 @@
 package view
 
 import (
-	"bytes"
 	"fmt"
-	"io"
-	"os"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/rethab/jira-cli/pkg/jira"
 	"github.com/rethab/jira-cli/pkg/tui"
@@ -18,66 +14,27 @@ const (
 	secondsPerMinute = 60
 )
 
-// WorklogDisplayFormat controls how a worklog view is rendered.
-type WorklogDisplayFormat struct {
-	Plain bool
-	CSV   bool
-}
-
-// IssueWorklogsOption is a functional option to configure IssueWorklogs.
-type IssueWorklogsOption func(*IssueWorklogs)
-
 // IssueWorklogs is a view of a single issue's worklogs.
 type IssueWorklogs struct {
-	Data    []jira.Worklog
-	Display WorklogDisplayFormat
-	writer  io.Writer
-	buf     *bytes.Buffer
+	Data []jira.Worklog
+	listView
 }
 
 // NewIssueWorklogs constructs a view for a single issue's worklogs.
-func NewIssueWorklogs(data []jira.Worklog, display WorklogDisplayFormat, opts ...IssueWorklogsOption) *IssueWorklogs {
-	w := IssueWorklogs{
-		Data:    data,
-		Display: display,
-		buf:     new(bytes.Buffer),
-	}
-	w.writer = tabwriter.NewWriter(w.buf, 0, tabWidth, 1, '\t', 0)
-
-	for _, opt := range opts {
-		opt(&w)
-	}
-	return &w
-}
-
-// WithIssueWorklogsWriter sets the writer used for the pager-backed render.
-func WithIssueWorklogsWriter(out io.Writer) IssueWorklogsOption {
-	return func(w *IssueWorklogs) {
-		w.writer = out
-	}
+func NewIssueWorklogs(data []jira.Worklog, display ListDisplayFormat, opts ...ListOption) *IssueWorklogs {
+	return &IssueWorklogs{Data: data, listView: newListView(display, opts)}
 }
 
 // Render renders the view.
 func (w *IssueWorklogs) Render() error {
-	data := w.data()
-
-	if w.Display.CSV {
-		return renderCSV(os.Stdout, data)
-	}
-	if w.Display.Plain {
-		return renderPlain(tabwriter.NewWriter(os.Stdout, 0, tabWidth, 1, '\t', 0), data, "\t")
-	}
-	if err := renderPlain(w.writer, data, "\t"); err != nil {
-		return err
-	}
-	return tui.PagerOut(w.buf.String())
+	return w.render(w.data())
 }
 
 func (w *IssueWorklogs) data() tui.TableData {
 	data := make(tui.TableData, 1, 1+len(w.Data))
-	data[0] = []string{"DATE", "TIME SPENT", "AUTHOR", "COMMENT"}
+	data[0] = []string{"ID", "DATE", "TIME SPENT", "AUTHOR", "COMMENT"}
 	for _, wl := range w.Data {
-		data = append(data, []string{dateOnly(wl.Started), wl.TimeSpent, wl.Author.Name, oneLine(wl.Comment)})
+		data = append(data, []string{wl.ID, dateOnly(wl.Started), wl.TimeSpent, wl.Author.Name, oneLine(wl.Comment)})
 	}
 	return data
 }
@@ -85,69 +42,39 @@ func (w *IssueWorklogs) data() tui.TableData {
 // WorklogReportEntry is a single row of a cross-issue worklog report.
 type WorklogReportEntry struct {
 	IssueKey         string
+	ID               string
 	IssueSummary     string
 	TimeSpent        string
 	TimeSpentSeconds int64
 	Comment          string
 }
 
-// WorklogReportOption is a functional option to configure WorklogReport.
-type WorklogReportOption func(*WorklogReport)
-
 // WorklogReport is a view of worklogs a user logged across issues on a given day.
 type WorklogReport struct {
-	Data    []WorklogReportEntry
-	Display WorklogDisplayFormat
-	writer  io.Writer
-	buf     *bytes.Buffer
+	Data []WorklogReportEntry
+	listView
 }
 
 // NewWorklogReport constructs a view for a cross-issue worklog report.
-func NewWorklogReport(data []WorklogReportEntry, display WorklogDisplayFormat, opts ...WorklogReportOption) *WorklogReport {
-	w := WorklogReport{
-		Data:    data,
-		Display: display,
-		buf:     new(bytes.Buffer),
-	}
-	w.writer = tabwriter.NewWriter(w.buf, 0, tabWidth, 1, '\t', 0)
-
-	for _, opt := range opts {
-		opt(&w)
-	}
-	return &w
-}
-
-// WithWorklogReportWriter sets the writer used for the pager-backed render.
-func WithWorklogReportWriter(out io.Writer) WorklogReportOption {
-	return func(w *WorklogReport) {
-		w.writer = out
-	}
+func NewWorklogReport(data []WorklogReportEntry, display ListDisplayFormat, opts ...ListOption) *WorklogReport {
+	return &WorklogReport{Data: data, listView: newListView(display, opts)}
 }
 
 // Render renders the view. The CSV format contains only the data rows, so
 // the total row does not throw off consumers that sum the column themselves.
 func (w *WorklogReport) Render() error {
-	if w.Display.CSV {
-		return renderCSV(os.Stdout, w.data())
-	}
-
 	data := w.data()
-	data = append(data, []string{"TOTAL", "", formatDuration(w.total()), ""})
-
-	if w.Display.Plain {
-		return renderPlain(tabwriter.NewWriter(os.Stdout, 0, tabWidth, 1, '\t', 0), data, "\t")
+	if !w.display.CSV {
+		data = append(data, []string{"TOTAL", "", "", formatDuration(w.total()), ""})
 	}
-	if err := renderPlain(w.writer, data, "\t"); err != nil {
-		return err
-	}
-	return tui.PagerOut(w.buf.String())
+	return w.render(data)
 }
 
 func (w *WorklogReport) data() tui.TableData {
 	data := make(tui.TableData, 1, 1+len(w.Data))
-	data[0] = []string{"ISSUE", "SUMMARY", "TIME SPENT", "COMMENT"}
+	data[0] = []string{"ISSUE", "ID", "SUMMARY", "TIME SPENT", "COMMENT"}
 	for _, e := range w.Data {
-		data = append(data, []string{e.IssueKey, oneLine(e.IssueSummary), e.TimeSpent, oneLine(e.Comment)})
+		data = append(data, []string{e.IssueKey, e.ID, oneLine(e.IssueSummary), e.TimeSpent, oneLine(e.Comment)})
 	}
 	return data
 }

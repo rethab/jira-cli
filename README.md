@@ -38,8 +38,10 @@ casks, and Docker images are published from this repository (see [Installation](
 
 Features not available upstream:
 
-- **Worklog listing**: `jira issue worklog list ISSUE-1` lists an issue's worklogs, and `jira worklog list` shows what
-  a user logged on a given day across all issues. See [Worklog](#worklog).
+- **Worklog management**: `jira issue worklog list`, `edit` and `delete` show the ids of an issue's worklogs, change a
+  worklog's time spent, start date or comment, and delete a worklog; `worklog add` prints the id of the new worklog, and
+  `jira worklog list` shows what a user logged on a given day across all issues, with the ids. See
+  [Worklog](#worklog). ([upstream #908](https://github.com/ankitpokhrel/jira-cli/pull/908))
 - **Comment management**: `jira issue comment list`, `edit` and `delete` show the ids of an issue's comments, replace a
   comment's body, and delete a comment; `comment add` prints the id of the new comment. See [Comment](#comment).
   ([upstream #975](https://github.com/ankitpokhrel/jira-cli/issues/975))
@@ -834,10 +836,12 @@ $ jira issue worklog add ISSUE-1 "2d 3h 30m" --no-input
 $ jira issue worklog add ISSUE-1 "10m" --comment "This is a comment" --no-input
 ```
 
+The command prints the id of the new worklog.
+
 ##### List
-The `list` command shows an issue's worklogs, newest first. Unlike the worklog field embedded in
+The `list` command shows an issue's worklogs, newest first, along with their ids. Unlike the worklog field embedded in
 the issue itself, this uses the dedicated worklog endpoint, so it also works for issues with more
-than 20 worklogs.
+than 20 worklogs. Use the id to edit or delete a worklog.
 
 ```sh
 $ jira issue worklog list ISSUE-1
@@ -847,6 +851,43 @@ $ jira issue worklog list ISSUE-1 --limit 10
 
 # Page through the oldest entries instead
 $ jira issue worklog list ISSUE-1 --oldest-first --start 40 --limit 20
+
+# Plain, CSV or raw JSON output
+$ jira issue worklog list ISSUE-1 --plain
+$ jira issue worklog list ISSUE-1 --plain --no-headers
+$ jira issue worklog list ISSUE-1 --csv
+$ jira issue worklog list ISSUE-1 --raw
+```
+
+##### Edit
+The `edit` command changes the time spent, start date or comment of a worklog. Whatever you don't change, including who
+can see the worklog, is left as it is. Without `--no-input` it prompts for the time spent and opens your editor on the
+current comment. The comment supports Markdown. Use `--new-estimate` to set the remaining estimate of the issue instead
+of letting Jira adjust it.
+
+```sh
+# Prompt for the time spent and edit the comment in your editor
+$ jira issue worklog edit ISSUE-1 10042
+
+# Pass the new time spent to skip its prompt
+$ jira issue worklog edit ISSUE-1 10042 "2d 1h 30m"
+
+# Change only the comment, without any prompt for scripts
+$ jira issue worklog edit ISSUE-1 10042 --comment "Fixed comment" --no-input
+
+# Change the start date
+$ jira issue worklog edit ISSUE-1 10042 --started "2022-01-01 09:30:00" --timezone "Europe/Berlin" --no-input
+```
+
+##### Delete
+The `delete` command deletes a worklog after asking for confirmation. Pass `--no-input` to skip the confirmation, and
+`--new-estimate` to set the remaining estimate of the issue instead of letting Jira adjust it.
+
+```sh
+$ jira issue worklog delete ISSUE-1 10042
+
+# Skip the confirmation prompt
+$ jira issue worklog delete ISSUE-1 10042 --no-input
 ```
 
 ### Worklog
@@ -854,9 +895,9 @@ $ jira issue worklog list ISSUE-1 --oldest-first --start 40 --limit 20
 The `worklog` command shows worklogs logged across issues, independent of any single issue.
 
 #### List
-The `list` command shows what a user logged on a given day, across every issue. Jira has no single
-endpoint for this, so it searches for candidate issues via JQL, then fetches and filters each
-issue's worklogs.
+The `list` command shows what a user logged on a given day, across every issue, along with the worklog ids. Jira has no
+single endpoint for this, so it searches for candidate issues via JQL, then fetches and filters each issue's worklogs.
+Use the issue key and the id to edit or delete a worklog with `jira issue worklog edit` or `delete`.
 
 ```sh
 # Today's worklogs for the configured user
