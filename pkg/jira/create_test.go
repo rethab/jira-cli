@@ -282,3 +282,108 @@ func TestCreateOptionCustomField(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateCascadingSelectCustomField(t *testing.T) {
+	component := IssueTypeField{Name: "Platform Component", Key: "customfield_14694"}
+	component.Schema.DataType = customFieldFormatOptionWithChild
+
+	cases := []struct {
+		name   string
+		value  string
+		fields string
+	}{
+		{
+			name:   "parent and child",
+			value:  "Pipelines/Scripts->Environment Management",
+			fields: `{"value":"Pipelines/Scripts","child":{"value":"Environment Management"}}`,
+		},
+		{
+			name:   "whitespace around both sides is trimmed",
+			value:  "  Pipelines  ->  Environment Management ",
+			fields: `{"value":"Pipelines","child":{"value":"Environment Management"}}`,
+		},
+		{
+			name:   "parent only",
+			value:  "Pipelines/Scripts",
+			fields: `{"value":"Pipelines/Scripts"}`,
+		},
+		{
+			name:   "only the first separator splits",
+			value:  "Parent->Child->Grandchild",
+			fields: `{"value":"Parent","child":{"value":"Child->Grandchild"}}`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			expectedBody := `{"update":{},"fields":{"project":{"key":"TEST"},"issuetype":{"name":"Task"},` +
+				`"summary":"Test","customfield_14694":` + tc.fields + `}}`
+
+			testServer := createTestServer{code: 201}
+			server := testServer.serve(t, expectedBody)
+			defer server.Close()
+
+			client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+			requestData := CreateRequest{
+				Project:      "TEST",
+				IssueType:    "Task",
+				Summary:      "Test",
+				CustomFields: map[string]string{"platform-component": tc.value},
+			}
+			requestData.WithCustomFields([]IssueTypeField{component})
+
+			_, err := client.CreateV2(&requestData)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestCreateCustomFieldByID(t *testing.T) {
+	reason := IssueTypeField{Name: "Reason", Key: "customfield_12345"}
+	reason.Schema.DataType = customFieldFormatOption
+
+	cases := []struct {
+		name string
+		key  string
+	}{
+		{name: "lowercase id", key: "customfield_12345"},
+		{name: "mixed case id", key: "CustomField_12345"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			expectedBody := `{"update":{},"fields":{"project":{"key":"TEST"},"issuetype":{"name":"Task"},` +
+				`"summary":"Test","customfield_12345":{"value":"Some Value"}}}`
+
+			testServer := createTestServer{code: 201}
+			server := testServer.serve(t, expectedBody)
+			defer server.Close()
+
+			client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+			requestData := CreateRequest{
+				Project:      "TEST",
+				IssueType:    "Task",
+				Summary:      "Test",
+				CustomFields: map[string]string{tc.key: "Some Value"},
+			}
+			requestData.WithCustomFields([]IssueTypeField{reason})
+
+			_, err := client.CreateV2(&requestData)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestCustomFieldMatches(t *testing.T) {
+	field := IssueTypeField{Name: "Platform Component", Key: "customfield_14694"}
+
+	assert.True(t, CustomFieldMatches("platform-component", field))
+	assert.True(t, CustomFieldMatches("Platform-Component", field))
+	assert.True(t, CustomFieldMatches("customfield_14694", field))
+	assert.True(t, CustomFieldMatches("CUSTOMFIELD_14694", field))
+	assert.False(t, CustomFieldMatches("customfield_14695", field))
+	assert.False(t, CustomFieldMatches("platform", field))
+	assert.False(t, CustomFieldMatches("", IssueTypeField{}), "empty key must not match a field with no name")
+}

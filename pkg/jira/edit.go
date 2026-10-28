@@ -392,6 +392,8 @@ func constructCustomFieldsForEdit(fields map[string]string, configuredFields []I
 			switch configured.Schema.DataType {
 			case customFieldFormatOption:
 				data.Update.M.customFields[configured.Key] = []customFieldTypeOptionSet{{Set: customFieldTypeOption{Value: val}}}
+			case customFieldFormatOptionWithChild:
+				data.Update.M.customFields[configured.Key] = []customFieldTypeOptionWithChildSet{{Set: parseCascadingValue(val)}}
 			case customFieldFormatProject:
 				data.Update.M.customFields[configured.Key] = []customFieldTypeProjectSet{{Set: customFieldTypeProject{Value: val}}}
 			case customFieldFormatArray:
