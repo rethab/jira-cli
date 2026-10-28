@@ -78,6 +78,13 @@ func TestFormatFallsBackToKeyWhenThereIsNoFieldID(t *testing.T) {
 	assert.Equal(t, "Reason (customfield_12345): option", format([]*jira.CreateMetaField{f}, false))
 }
 
+func TestFormatProjectFieldUsesKey(t *testing.T) {
+	f := newField("customfield_10100", "Target Project", "project", "", false,
+		jira.CreateMetaAllowedValue{Key: "PROJ", Name: "My Project"})
+
+	assert.Equal(t, "Target Project (customfield_10100): project\n  PROJ", format([]*jira.CreateMetaField{f}, false))
+}
+
 func TestFilterRequired(t *testing.T) {
 	got := filterRequired(testFields())
 

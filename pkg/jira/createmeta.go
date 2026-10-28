@@ -106,9 +106,11 @@ func (c *Client) GetCreateMetaForJiraServerV9(req *CreateMetaRequest) (*CreateMe
 const createMetaPageSize = 200
 
 // CreateMetaAllowedValue is one allowed value of a field on the create screen. Options carry
-// a value, system fields like priority or components a name, and cascading selects children.
+// a value, system fields like priority or components a name, projects a key, and cascading
+// selects children.
 type CreateMetaAllowedValue struct {
 	Value    string                   `json:"value,omitempty"`
+	Key      string                   `json:"key,omitempty"`
 	Name     string                   `json:"name,omitempty"`
 	Children []CreateMetaAllowedValue `json:"children,omitempty"`
 }
@@ -276,6 +278,9 @@ func (c *Client) getCreateFieldsLegacy(project, issueType string) ([]*CreateMeta
 	var meta legacyCreateMetaResponse
 	if err := json.NewDecoder(res.Body).Decode(&meta); err != nil {
 		return nil, err
+	}
+	if len(meta.Projects) == 0 {
+		return nil, fmt.Errorf("project %s not found", project)
 	}
 
 	var names []string

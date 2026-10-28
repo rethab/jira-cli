@@ -3,6 +3,7 @@ package cmdcommon
 import (
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -70,7 +71,8 @@ func TestGetMetadataOptions(t *testing.T) {
 const fieldsResponse = `[
 	{"id":"summary","name":"Summary","custom":false,"schema":{"type":"string"}},
 	{"id":"customfield_14694","name":"Platform Component","custom":true,"schema":{"type":"option-with-child"}},
-	{"id":"customfield_14695","name":"Environments Affected","custom":true,"schema":{"type":"array","items":"option"}}
+	{"id":"customfield_14695","name":"Environments Affected","custom":true,"schema":{"type":"array","items":"option"}},
+	{"id":"customfield_20000","name":"Reason","custom":true,"schema":{"type":"string"}}
 ]`
 
 func resolveTestClient(t *testing.T, requests *int) *jira.Client {
@@ -178,6 +180,31 @@ func TestResolveCustomFields(t *testing.T) {
 		for _, f := range fields {
 			assert.NotEqual(t, "customfield_14695", f.Key)
 		}
+	})
+
+	t.Run("a field looked up by id is not matched by a configured field's name", func(t *testing.T) {
+		configureCustomFields(t)
+
+		var requests int
+		client := resolveTestClient(t, &requests)
+
+		fields, err := ResolveCustomFields(client, map[string]string{
+			"reason":            "x",
+			"customfield_20000": "y",
+		})
+
+		assert.NoError(t, err)
+
+		var matches []string
+		for _, f := range fields {
+			if jira.CustomFieldMatches("reason", f) {
+				matches = append(matches, f.Key)
+			}
+		}
+		assert.Equal(t, []string{"customfield_12345"}, matches)
+		assert.True(t, slices.ContainsFunc(fields, func(f jira.IssueTypeField) bool {
+			return jira.CustomFieldMatches("customfield_20000", f)
+		}))
 	})
 
 	t.Run("still unknown keys fail naming all of them", func(t *testing.T) {

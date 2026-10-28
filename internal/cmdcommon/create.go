@@ -289,9 +289,19 @@ func ResolveCustomFields(client *jira.Client, fields map[string]string) ([]jira.
 		looked.Schema.DataType = f.Schema.DataType
 		looked.Schema.Items = f.Schema.Items
 
-		if slices.ContainsFunc(unmatched, func(k string) bool { return jira.CustomFieldMatches(k, looked) }) {
-			configured = append(configured, looked)
+		if !slices.ContainsFunc(unmatched, func(k string) bool { return jira.CustomFieldMatches(k, looked) }) {
+			continue
 		}
+
+		// A field asked for only by id must not also pick up a name key meant for a
+		// configured field of the same name, or that field's value could land here too.
+		byName := slices.ContainsFunc(unmatched, func(k string) bool {
+			return jira.CustomFieldMatches(k, jira.IssueTypeField{Name: f.Name})
+		})
+		if !byName {
+			looked.Name = ""
+		}
+		configured = append(configured, looked)
 	}
 
 	if unknown := unmatchedKeys(fields, configured); len(unknown) > 0 {

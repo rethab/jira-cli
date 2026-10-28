@@ -53,8 +53,9 @@ func parseCascadingValue(val string) customFieldTypeOptionWithChild {
 	parent, child, found := strings.Cut(val, cascadingSeparator)
 
 	out := customFieldTypeOptionWithChild{Value: strings.TrimSpace(parent)}
-	if found {
-		out.Child = &customFieldTypeOption{Value: strings.TrimSpace(child)}
+	// "Parent->" means the parent alone; an empty child would be rejected by Jira.
+	if child = strings.TrimSpace(child); found && child != "" {
+		out.Child = &customFieldTypeOption{Value: child}
 	}
 	return out
 }

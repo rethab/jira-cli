@@ -51,6 +51,9 @@ func NewCmdFields() *cobra.Command {
 
 func fields(cmd *cobra.Command, _ []string) {
 	project := viper.GetString("project.key")
+	if project == "" {
+		cmdutil.Failed("Project is not set, pass it with -p/--project or configure it with 'jira init'")
+	}
 
 	issueType, err := cmd.Flags().GetString("type")
 	cmdutil.ExitIfError(err)
@@ -106,7 +109,7 @@ func format(fields []*jira.CreateMetaField, plain bool) string {
 	blocks := make([]string, 0, len(fields))
 
 	for _, f := range fields {
-		values := allowedValues(f.AllowedValues)
+		values := allowedValues(f)
 
 		if plain {
 			blocks = append(blocks, formatPlain(f, values))
@@ -157,12 +160,17 @@ func fieldType(f *jira.CreateMetaField) string {
 }
 
 // allowedValues writes the values the way '--custom' accepts them: "value" for options,
-// "name" for system fields, and "Parent->Child" for each child of a cascading select.
-func allowedValues(values []jira.CreateMetaAllowedValue) []string {
-	out := make([]string, 0, len(values))
+// "key" for projects, "name" for system fields, and "Parent->Child" for each child of a
+// cascading select.
+func allowedValues(f *jira.CreateMetaField) []string {
+	out := make([]string, 0, len(f.AllowedValues))
 
-	for _, v := range values {
+	for _, v := range f.AllowedValues {
 		label := v.Value
+		// A project-type --custom value is sent as the project key, not its name.
+		if f.Schema.DataType == "project" && v.Key != "" {
+			label = v.Key
+		}
 		if label == "" {
 			label = v.Name
 		}
