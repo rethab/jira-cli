@@ -10,6 +10,7 @@ import (
 	"github.com/rethab/jira-cli/internal/cmd/issue/create"
 	"github.com/rethab/jira-cli/internal/cmd/issue/delete"
 	"github.com/rethab/jira-cli/internal/cmd/issue/edit"
+	"github.com/rethab/jira-cli/internal/cmd/issue/fields"
 	"github.com/rethab/jira-cli/internal/cmd/issue/link"
 	"github.com/rethab/jira-cli/internal/cmd/issue/list"
 	"github.com/rethab/jira-cli/internal/cmd/issue/move"
@@ -37,7 +38,7 @@ func NewCmdIssue() *cobra.Command {
 	cc := create.NewCmdCreate()
 
 	cmd.AddCommand(
-		lc, cc, edit.NewCmdEdit(), move.NewCmdMove(), transitions.NewCmdTransitions(), view.NewCmdView(), assign.NewCmdAssign(),
+		lc, cc, edit.NewCmdEdit(), move.NewCmdMove(), transitions.NewCmdTransitions(), fields.NewCmdFields(), view.NewCmdView(), assign.NewCmdAssign(),
 		link.NewCmdLink(), unlink.NewCmdUnlink(), comment.NewCmdComment(), clone.NewCmdClone(),
 		delete.NewCmdDelete(), watch.NewCmdWatch(), worklog.NewCmdWorklog(),
 		attachment.NewCmdAttachment(),

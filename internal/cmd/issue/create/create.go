@@ -31,6 +31,10 @@ $ jira issue create -pPRJ -tBug -yHigh -s"New Bug" -b$'Bug description\n\nSome m
 # See https://github.com/rethab/jira-cli/discussions/346
 $ jira issue create -tStory -s"Issue with custom fields" --custom story-points=3
 
+# Custom fields can also be set by id, and cascading selects take "Parent->Child"
+# Use 'jira issue fields -t TYPE' to see the fields and values of an issue type
+$ jira issue create -tProblem -s"Cascading select" --custom customfield_14694="Pipelines/Scripts->Release"
+
 # Load description from template file
 $ jira issue create --template /path/to/template.tmpl
 
