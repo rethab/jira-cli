@@ -136,6 +136,7 @@ func worklogEntries(client *jira.Client, user, date string) ([]view.WorklogRepor
 			}
 			entries = append(entries, view.WorklogReportEntry{
 				IssueKey:         issue.Key,
+				ID:               wl.ID,
 				IssueSummary:     issue.Fields.Summary,
 				TimeSpent:        wl.TimeSpent,
 				TimeSpentSeconds: wl.TimeSpentSeconds,

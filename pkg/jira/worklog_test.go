@@ -214,6 +214,7 @@ func TestDeleteIssueWorklog(t *testing.T) {
 	assert.NoError(t, client.DeleteIssueWorklog("TEST-1", "10042", "1h 30m"))
 
 	unexpectedStatusCode = true
+	expectedQuery = url.Values{}
 
 	err := client.DeleteIssueWorklog("TEST-1", "10042", "")
 	assertUnexpectedResponse(t, err)

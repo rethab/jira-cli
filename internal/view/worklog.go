@@ -42,9 +42,9 @@ func (w *IssueWorklogs) Render() error {
 
 func (w *IssueWorklogs) data() tui.TableData {
 	data := make(tui.TableData, 1, 1+len(w.Data))
-	data[0] = []string{"DATE", "TIME SPENT", "AUTHOR", "COMMENT"}
+	data[0] = []string{"ID", "DATE", "TIME SPENT", "AUTHOR", "COMMENT"}
 	for _, wl := range w.Data {
-		data = append(data, []string{dateOnly(wl.Started), wl.TimeSpent, wl.Author.Name, oneLine(wl.Comment)})
+		data = append(data, []string{wl.ID, dateOnly(wl.Started), wl.TimeSpent, wl.Author.Name, oneLine(wl.Comment)})
 	}
 	return data
 }
@@ -100,7 +100,7 @@ func (w *WorklogReport) Render() error {
 	}
 
 	data := w.data()
-	data = append(data, []string{"TOTAL", "", formatDuration(w.total()), ""})
+	data = append(data, []string{"TOTAL", "", "", formatDuration(w.total()), ""})
 
 	if w.Display.Plain {
 		return renderPlain(tabwriter.NewWriter(os.Stdout, 0, tabWidth, 1, '\t', 0), data, "\t")
@@ -113,9 +113,9 @@ func (w *WorklogReport) Render() error {
 
 func (w *WorklogReport) data() tui.TableData {
 	data := make(tui.TableData, 1, 1+len(w.Data))
-	data[0] = []string{"ISSUE", "SUMMARY", "TIME SPENT", "COMMENT"}
+	data[0] = []string{"ISSUE", "ID", "SUMMARY", "TIME SPENT", "COMMENT"}
 	for _, e := range w.Data {
-		data = append(data, []string{e.IssueKey, oneLine(e.IssueSummary), e.TimeSpent, oneLine(e.Comment)})
+		data = append(data, []string{e.IssueKey, e.ID, oneLine(e.IssueSummary), e.TimeSpent, oneLine(e.Comment)})
 	}
 	return data
 }

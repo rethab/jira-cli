@@ -62,7 +62,7 @@ func TestMerge(t *testing.T) {
 	t.Run("empty comment clears it", func(t *testing.T) {
 		p := editParams{comment: ptr("")}
 
-		assert.Equal(t, "", p.merge(existing).Comment)
+		assert.Empty(t, p.merge(existing).Comment)
 	})
 
 	t.Run("started is replaced", func(t *testing.T) {
