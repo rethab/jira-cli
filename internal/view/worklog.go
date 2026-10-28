@@ -18,59 +18,26 @@ const (
 	secondsPerMinute = 60
 )
 
-// WorklogDisplayFormat controls how a worklog view is rendered.
+// WorklogDisplayFormat controls how the worklog report is rendered.
 type WorklogDisplayFormat struct {
 	Plain bool
 	CSV   bool
 }
 
-// IssueWorklogsOption is a functional option to configure IssueWorklogs.
-type IssueWorklogsOption func(*IssueWorklogs)
-
 // IssueWorklogs is a view of a single issue's worklogs.
 type IssueWorklogs struct {
-	Data    []jira.Worklog
-	Display WorklogDisplayFormat
-	writer  io.Writer
-	buf     *bytes.Buffer
+	Data []jira.Worklog
+	listView
 }
 
 // NewIssueWorklogs constructs a view for a single issue's worklogs.
-func NewIssueWorklogs(data []jira.Worklog, display WorklogDisplayFormat, opts ...IssueWorklogsOption) *IssueWorklogs {
-	w := IssueWorklogs{
-		Data:    data,
-		Display: display,
-		buf:     new(bytes.Buffer),
-	}
-	w.writer = tabwriter.NewWriter(w.buf, 0, tabWidth, 1, '\t', 0)
-
-	for _, opt := range opts {
-		opt(&w)
-	}
-	return &w
-}
-
-// WithIssueWorklogsWriter sets the writer used for the pager-backed render.
-func WithIssueWorklogsWriter(out io.Writer) IssueWorklogsOption {
-	return func(w *IssueWorklogs) {
-		w.writer = out
-	}
+func NewIssueWorklogs(data []jira.Worklog, display ListDisplayFormat, opts ...ListOption) *IssueWorklogs {
+	return &IssueWorklogs{Data: data, listView: newListView(display, opts)}
 }
 
 // Render renders the view.
 func (w *IssueWorklogs) Render() error {
-	data := w.data()
-
-	if w.Display.CSV {
-		return renderCSV(os.Stdout, data)
-	}
-	if w.Display.Plain {
-		return renderPlain(tabwriter.NewWriter(os.Stdout, 0, tabWidth, 1, '\t', 0), data, "\t")
-	}
-	if err := renderPlain(w.writer, data, "\t"); err != nil {
-		return err
-	}
-	return tui.PagerOut(w.buf.String())
+	return w.render(w.data())
 }
 
 func (w *IssueWorklogs) data() tui.TableData {
@@ -85,6 +52,7 @@ func (w *IssueWorklogs) data() tui.TableData {
 // WorklogReportEntry is a single row of a cross-issue worklog report.
 type WorklogReportEntry struct {
 	IssueKey         string
+	ID               string
 	IssueSummary     string
 	TimeSpent        string
 	TimeSpentSeconds int64

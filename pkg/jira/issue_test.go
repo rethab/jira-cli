@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/rethab/jira-cli/pkg/adf"
 )
@@ -585,8 +586,8 @@ func TestAddIssueWorklog(t *testing.T) {
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
 		var (
-			expectedBody, expectedQuery string
-			actualBody                  = new(strings.Builder)
+			expectedBody string
+			actualBody   = new(strings.Builder)
 		)
 
 		_, _ = io.Copy(actualBody, r.Body)
@@ -600,32 +601,37 @@ func TestAddIssueWorklog(t *testing.T) {
 		assert.Equal(t, expectedBody, actualBody.String())
 
 		if r.URL.RawQuery != "" {
-			expectedQuery = `adjustEstimate=new&newEstimate=1d`
+			assert.Equal(t, "new", r.URL.Query().Get("adjustEstimate"))
+			assert.Equal(t, "1h 30m", r.URL.Query().Get("newEstimate"))
 		}
-		assert.Equal(t, expectedQuery, r.URL.RawQuery)
 
 		if unexpectedStatusCode {
 			w.WriteHeader(400)
 		} else {
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(201)
+			_, _ = w.Write([]byte(`{"id":"10042","timeSpent":"1h"}`))
 		}
 	}))
 	defer server.Close()
 
 	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
 
-	err := client.AddIssueWorklog("TEST-1", "2022-01-01T01:02:02.000+0200", "1h", "comment", "")
-	assert.NoError(t, err)
+	out, err := client.AddIssueWorklog("TEST-1", "2022-01-01T01:02:02.000+0200", "1h", "comment", "")
+	require.NoError(t, err)
+	assert.Equal(t, "10042", out.ID)
 
-	err = client.AddIssueWorklog("TEST-1", "", "1h", "comment", "")
-	assert.NoError(t, err)
+	out, err = client.AddIssueWorklog("TEST-1", "", "1h", "comment", "")
+	require.NoError(t, err)
+	assert.Equal(t, "10042", out.ID)
 
-	err = client.AddIssueWorklog("TEST-1", "", "1h", "comment", "1d")
-	assert.NoError(t, err)
+	out, err = client.AddIssueWorklog("TEST-1", "", "1h", "comment", "1h 30m")
+	require.NoError(t, err)
+	assert.Equal(t, "10042", out.ID)
 
 	unexpectedStatusCode = true
 
-	err = client.AddIssueWorklog("TEST-1", "", "1h", "comment", "")
+	_, err = client.AddIssueWorklog("TEST-1", "", "1h", "comment", "")
 	assertUnexpectedResponse(t, err)
 }
 

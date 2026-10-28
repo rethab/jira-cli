@@ -97,7 +97,7 @@ func add(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	err := func() error {
+	_, err := func() (*jira.Worklog, error) {
 		s := cmdutil.Info("Adding a worklog")
 		defer s.Stop()
 

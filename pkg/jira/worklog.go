@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/rethab/jira-cli/pkg/md"
 )
 
 // WorklogAuthor holds the author of a worklog entry.
@@ -21,6 +23,74 @@ type Worklog struct {
 	Started          string        `json:"started"`
 	TimeSpent        string        `json:"timeSpent"`
 	TimeSpentSeconds int64         `json:"timeSpentSeconds"`
+
+	Visibility *CommentVisibility `json:"visibility,omitempty"`
+}
+
+// WorklogUpdate is the body of a worklog update. Comment is wiki markup.
+type WorklogUpdate struct {
+	Started    string             `json:"started,omitempty"`
+	TimeSpent  string             `json:"timeSpent"`
+	Comment    string             `json:"comment"`
+	Visibility *CommentVisibility `json:"visibility,omitempty"`
+}
+
+type issueWorklogRequest struct {
+	Started   string `json:"started,omitempty"`
+	TimeSpent string `json:"timeSpent"`
+	Comment   string `json:"comment"`
+}
+
+// AddIssueWorklog adds worklog to an issue using POST /issue/{key}/worklog endpoint.
+// Leave param `started` empty to use the server's current datetime as start date.
+func (c *Client) AddIssueWorklog(key, started, timeSpent, comment, newEstimate string) (*Worklog, error) {
+	worklogReq := issueWorklogRequest{
+		TimeSpent: timeSpent,
+		Comment:   md.ToJiraMD(comment),
+	}
+	if started != "" {
+		worklogReq.Started = started
+	}
+	body, err := json.Marshal(&worklogReq)
+	if err != nil {
+		return nil, err
+	}
+
+	path := fmt.Sprintf("/issue/%s/worklog", key)
+	if newEstimate != "" {
+		path = fmt.Sprintf("%s?adjustEstimate=new&newEstimate=%s", path, newEstimate)
+	}
+	res, err := c.PostV2(context.Background(), path, body, Header{
+		"Accept":       "application/json",
+		"Content-Type": "application/json",
+	})
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, ErrEmptyResponse
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	if res.StatusCode != http.StatusCreated {
+		return nil, formatUnexpectedResponse(res)
+	}
+	return &Worklog{}, nil
+}
+
+// GetIssueWorklog fetches a single worklog using GET /issue/{key}/worklog/{id} endpoint.
+func (c *Client) GetIssueWorklog(key, id string) (*Worklog, error) {
+	return &Worklog{}, ErrEmptyResponse
+}
+
+// UpdateIssueWorklog replaces a worklog using PUT /issue/{key}/worklog/{id} endpoint.
+func (c *Client) UpdateIssueWorklog(key, id string, req WorklogUpdate, newEstimate string) (*Worklog, error) {
+	return &Worklog{}, ErrEmptyResponse
+}
+
+// DeleteIssueWorklog deletes a worklog using DELETE /issue/{key}/worklog/{id} endpoint.
+func (c *Client) DeleteIssueWorklog(key, id, newEstimate string) error {
+	return ErrEmptyResponse
 }
 
 // WorklogPage holds a page of worklog entries. StartAt, MaxResults and Total

@@ -12,7 +12,6 @@ import (
 
 	"github.com/rethab/jira-cli/pkg/adf"
 	"github.com/rethab/jira-cli/pkg/jira/filter"
-	"github.com/rethab/jira-cli/pkg/md"
 )
 
 const (
@@ -339,49 +338,6 @@ func (c *Client) AddIssueComment(key, comment string, internal bool) (*Comment, 
 		return nil, err
 	}
 	return &out, nil
-}
-
-type issueWorklogRequest struct {
-	Started   string `json:"started,omitempty"`
-	TimeSpent string `json:"timeSpent"`
-	Comment   string `json:"comment"`
-}
-
-// AddIssueWorklog adds worklog to an issue using POST /issue/{key}/worklog endpoint.
-// Leave param `started` empty to use the server's current datetime as start date.
-func (c *Client) AddIssueWorklog(key, started, timeSpent, comment, newEstimate string) error {
-	worklogReq := issueWorklogRequest{
-		TimeSpent: timeSpent,
-		Comment:   md.ToJiraMD(comment),
-	}
-	if started != "" {
-		worklogReq.Started = started
-	}
-	body, err := json.Marshal(&worklogReq)
-	if err != nil {
-		return err
-	}
-
-	path := fmt.Sprintf("/issue/%s/worklog", key)
-	if newEstimate != "" {
-		path = fmt.Sprintf("%s?adjustEstimate=new&newEstimate=%s", path, newEstimate)
-	}
-	res, err := c.PostV2(context.Background(), path, body, Header{
-		"Accept":       "application/json",
-		"Content-Type": "application/json",
-	})
-	if err != nil {
-		return err
-	}
-	if res == nil {
-		return ErrEmptyResponse
-	}
-	defer func() { _ = res.Body.Close() }()
-
-	if res.StatusCode != http.StatusCreated {
-		return formatUnexpectedResponse(res)
-	}
-	return nil
 }
 
 // GetField gets all fields configured for a Jira instance using GET /field endpiont.
