@@ -47,7 +47,7 @@ func TestWorklogReportRender(t *testing.T) {
 		{IssueKey: "TEST-2", ID: "10002", IssueSummary: "Ship the other thing", TimeSpent: "1h 15m", TimeSpentSeconds: 4500, Comment: "sprint planning"},
 	}
 
-	w := NewWorklogReport(data, WorklogDisplayFormat{}, WithWorklogReportWriter(&b))
+	w := NewWorklogReport(data, ListDisplayFormat{}, WithListWriter(&b))
 	assert.NoError(t, w.Render())
 
 	expected := "ISSUE\tID\tSUMMARY\tTIME SPENT\tCOMMENT\n" +
@@ -62,6 +62,6 @@ func TestWorklogReportRenderCSVExcludesTotal(t *testing.T) {
 		{IssueKey: "TEST-1", TimeSpent: "15m", TimeSpentSeconds: 900, Comment: "standup"},
 	}
 
-	w := NewWorklogReport(data, WorklogDisplayFormat{CSV: true})
+	w := NewWorklogReport(data, ListDisplayFormat{CSV: true})
 	assert.NoError(t, w.Render())
 }

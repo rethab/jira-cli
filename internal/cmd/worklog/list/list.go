@@ -95,7 +95,7 @@ func list(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	v := view.NewWorklogReport(entries, view.WorklogDisplayFormat{Plain: plain, CSV: csv})
+	v := view.NewWorklogReport(entries, view.ListDisplayFormat{Plain: plain, CSV: csv})
 	cmdutil.ExitIfError(v.Render())
 }
 

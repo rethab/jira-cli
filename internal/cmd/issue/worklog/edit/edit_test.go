@@ -65,6 +65,20 @@ func TestMerge(t *testing.T) {
 		assert.Empty(t, p.merge(existing).Comment)
 	})
 
+	t.Run("time spent is kept in seconds", func(t *testing.T) {
+		withSeconds := *existing
+		withSeconds.TimeSpent = "1h 30m"
+		withSeconds.TimeSpentSeconds = 5430
+
+		got := (&editParams{comment: ptr("new")}).merge(&withSeconds)
+		assert.Equal(t, int64(5430), got.TimeSpentSeconds)
+		assert.Empty(t, got.TimeSpent)
+
+		got = (&editParams{timeSpent: "2h"}).merge(&withSeconds)
+		assert.Equal(t, "2h", got.TimeSpent)
+		assert.Zero(t, got.TimeSpentSeconds)
+	})
+
 	t.Run("started is replaced", func(t *testing.T) {
 		p := editParams{started: "2022-02-02T10:00:00.000+0100"}
 

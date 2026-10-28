@@ -28,12 +28,16 @@ type Worklog struct {
 	Visibility *CommentVisibility `json:"visibility,omitempty"`
 }
 
-// WorklogUpdate is the body of a worklog update. Comment is wiki markup.
+// WorklogUpdate is the body of a worklog create or update. Comment is wiki
+// markup. Set either TimeSpent or TimeSpentSeconds: the formatted TimeSpent
+// Jira returns is rounded to minutes, so sending it back would change a worklog
+// that has seconds.
 type WorklogUpdate struct {
-	Started    string             `json:"started,omitempty"`
-	TimeSpent  string             `json:"timeSpent"`
-	Comment    string             `json:"comment"`
-	Visibility *CommentVisibility `json:"visibility,omitempty"`
+	Started          string             `json:"started,omitempty"`
+	TimeSpent        string             `json:"timeSpent,omitempty"`
+	TimeSpentSeconds int64              `json:"timeSpentSeconds,omitempty"`
+	Comment          string             `json:"comment"`
+	Visibility       *CommentVisibility `json:"visibility,omitempty"`
 }
 
 // WorklogPage holds a page of worklog entries. StartAt, MaxResults and Total
@@ -83,23 +87,14 @@ func (c *Client) getIssueWorklogs(path string) (*WorklogPage, error) {
 	return &out, err
 }
 
-type issueWorklogRequest struct {
-	Started   string `json:"started,omitempty"`
-	TimeSpent string `json:"timeSpent"`
-	Comment   string `json:"comment"`
-}
-
 // AddIssueWorklog adds worklog to an issue using POST /issue/{key}/worklog endpoint.
 // Leave param `started` empty to use the server's current datetime as start date.
 func (c *Client) AddIssueWorklog(key, started, timeSpent, comment, newEstimate string) (*Worklog, error) {
-	worklogReq := issueWorklogRequest{
+	body, err := json.Marshal(&WorklogUpdate{
+		Started:   started,
 		TimeSpent: timeSpent,
 		Comment:   md.ToJiraMD(comment),
-	}
-	if started != "" {
-		worklogReq.Started = started
-	}
-	body, err := json.Marshal(&worklogReq)
+	})
 	if err != nil {
 		return nil, err
 	}

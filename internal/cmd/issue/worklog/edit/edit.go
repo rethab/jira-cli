@@ -2,6 +2,7 @@ package edit
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
@@ -167,13 +168,17 @@ func (p *editParams) nothingToUpdate() bool {
 func (p *editParams) merge(existing *jira.Worklog) jira.WorklogUpdate {
 	update := jira.WorklogUpdate{
 		Started:    existing.Started,
-		TimeSpent:  existing.TimeSpent,
 		Comment:    existing.Comment,
 		Visibility: existing.Visibility,
 	}
 
-	if p.timeSpent != "" {
+	switch {
+	case p.timeSpent != "":
 		update.TimeSpent = p.timeSpent
+	case existing.TimeSpentSeconds > 0:
+		update.TimeSpentSeconds = existing.TimeSpentSeconds
+	default:
+		update.TimeSpent = existing.TimeSpent
 	}
 	if p.started != "" {
 		update.Started = p.started
@@ -185,9 +190,10 @@ func (p *editParams) merge(existing *jira.Worklog) jira.WorklogUpdate {
 	return update
 }
 
-// ask prompts for what wasn't passed, starting from the current values. The
-// comment is only taken over when it differs from what the editor started
-// with, so skipping the prompt doesn't round-trip it through Markdown.
+// ask prompts for what wasn't passed, starting from the current values. Only
+// answers that differ from the current values are taken over, so accepting a
+// prompt doesn't round the time spent to minutes or round-trip the comment
+// through Markdown. Editors append a final newline on save, so it is ignored.
 func (p *editParams) ask(existing *jira.Worklog) error {
 	var qs []*survey.Question
 
@@ -228,10 +234,10 @@ func (p *editParams) ask(existing *jira.Worklog) error {
 		return err
 	}
 
-	if ans.TimeSpent != "" {
+	if ans.TimeSpent != "" && ans.TimeSpent != existing.TimeSpent {
 		p.timeSpent = ans.TimeSpent
 	}
-	if p.comment == nil && ans.Comment != current {
+	if p.comment == nil && strings.TrimRight(ans.Comment, "\n") != strings.TrimRight(current, "\n") {
 		p.comment = &ans.Comment
 	}
 

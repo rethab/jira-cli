@@ -111,6 +111,9 @@ func list(cmd *cobra.Command, args []string) {
 	cmdutil.ExitIfError(err)
 
 	if raw {
+		if worklogs == nil {
+			worklogs = []jira.Worklog{}
+		}
 		cmdutil.OutputRawJSON(worklogs)
 		return
 	}
