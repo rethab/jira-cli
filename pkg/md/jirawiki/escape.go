@@ -61,11 +61,8 @@ func protectLine(line string) (string, bool) {
 		case line[i] == '\\' && i+1 < len(line) && strings.IndexByte(escapable, line[i+1]) >= 0:
 			out.WriteRune(markerBase + rune(line[i+1]))
 			i += 2
-		case strings.HasPrefix(line[i:], "{{"):
-			end := len(line)
-			if n := strings.Index(line[i+2:], "}}"); n >= 0 {
-				end = i + 2 + n + 2
-			}
+		case strings.HasPrefix(line[i:], "{{") && monospaceEnd(line, i) > 0:
+			end := monospaceEnd(line, i)
 			out.WriteString(line[i:end])
 			i = end
 		case line[i] == '{':
@@ -89,6 +86,23 @@ func protectLine(line string) (string, bool) {
 	}
 
 	return out.String(), false
+}
+
+// monospaceEnd returns the end of the {{...}} span that opens at i, or 0 if it
+// isn't closed on the line or holds a code macro. The wiki parser has no notion
+// of monospace and would still open a code block on such a macro, so its lines
+// must not be protected.
+func monospaceEnd(line string, i int) int {
+	n := strings.Index(line[i+2:], "}}")
+	if n < 0 {
+		return 0
+	}
+	end := i + 2 + n + 2
+	span := line[i:end]
+	if strings.Contains(span, TagCodeBlock[:len(TagCodeBlock)-1]) || strings.Contains(span, TagNoFormat[:len(TagNoFormat)-1]) {
+		return 0
+	}
+	return end
 }
 
 // codeTagAt returns the closing form of the code macro that opens at the start
@@ -125,8 +139,7 @@ func restoreEscapes(s string) string {
 			continue
 		}
 
-		prefix := string(out[lineStart:])
-		if needsMarkdownEscape(c, neighbour(runes, i-1), neighbour(runes, i+1), prefix) {
+		if needsMarkdownEscape(c, neighbour(runes, i-1), neighbour(runes, i+1), out[lineStart:]) {
 			out = append(out, '\\')
 		}
 		out = append(out, c)
@@ -145,7 +158,8 @@ func unmark(r rune) (rune, bool) {
 
 func hasMarker(s string) bool {
 	return strings.ContainsFunc(s, func(r rune) bool {
-		return r >= markerBase && r <= markerBase+unicode.MaxASCII
+		_, ok := unmark(r)
+		return ok
 	})
 }
 
@@ -163,7 +177,7 @@ func neighbour(runes []rune, i int) rune {
 
 // needsMarkdownEscape reports whether c must stay escaped in markdown, given
 // its neighbours (0 at the ends of the line) and the output of its line so far.
-func needsMarkdownEscape(c, prev, next rune, prefix string) bool {
+func needsMarkdownEscape(c, prev, next rune, prefix []rune) bool {
 	spaced := (prev != 0 && unicode.IsSpace(prev)) && (next == 0 || unicode.IsSpace(next))
 
 	switch c {
@@ -176,9 +190,9 @@ func needsMarkdownEscape(c, prev, next rune, prefix string) bool {
 		// '](' makes a link, '][' and ']:' a reference link and its definition.
 		return next == '(' || next == '[' || next == ':'
 	case '-', '+', '#':
-		return blockStart.MatchString(prefix)
+		return blockStart.MatchString(string(prefix))
 	case '|':
-		return strings.HasPrefix(prefix, "|")
+		return len(prefix) > 0 && prefix[0] == '|'
 	default:
 		return false
 	}

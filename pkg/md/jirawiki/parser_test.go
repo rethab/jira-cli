@@ -871,6 +871,11 @@ func TestParseKeepsEscapesInCode(t *testing.T) {
 			expected: `x-y {{a\-b}} z-w`,
 		},
 		{
+			name:     "code block opened inside monospace",
+			input:    "{{a {code} b}}\nre\\-x\n{code}",
+			expected: "{{a \n```\nre\\-x\n```\n",
+		},
+		{
 			name:     "text after a code block is unescaped again",
 			input:    "{code}\nre\\-x\n{code}\nafter\\-wards",
 			expected: "\n```\nre\\-x\n```\nafter-wards",
