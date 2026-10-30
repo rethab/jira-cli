@@ -697,3 +697,196 @@ func TestParseNonASCIIText(t *testing.T) {
 		})
 	}
 }
+
+func TestParseUnescapesWikiEscapes(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "dash in a word",
+			input:    `re\-reviewed enterprise rename fix in migration`,
+			expected: "re-reviewed enterprise rename fix in migration",
+		},
+		{
+			name:     "characters that are inert in markdown",
+			input:    `a\+b \^ \(c\) \!d \{e\} \?`,
+			expected: "a+b ^ (c) !d {e} ?",
+		},
+		{
+			name:     "pipe outside of a table",
+			input:    `a\|b`,
+			expected: "a|b",
+		},
+		{
+			name:     "asterisk surrounded by spaces",
+			input:    `2 \* 3`,
+			expected: "2 * 3",
+		},
+		{
+			name:     "asterisk glued to a word stays escaped",
+			input:    `2\*3`,
+			expected: `2\*3`,
+		},
+		{
+			name:     "escaped asterisks are not bold",
+			input:    `\*not bold\*`,
+			expected: `\*not bold\*`,
+		},
+		{
+			name:     "underscores inside a word",
+			input:    `snake\_case\_name`,
+			expected: "snake_case_name",
+		},
+		{
+			name:     "underscore that would start emphasis stays escaped",
+			input:    `\_private\_ and \_\_init\_\_`,
+			expected: `\_private\_ and \_\_init\_\_`,
+		},
+		{
+			name:     "tilde stays escaped to not become strikethrough",
+			input:    `\~\~not struck\~\~`,
+			expected: `\~\~not struck\~\~`,
+		},
+		{
+			name:     "square brackets",
+			input:    `fixed \[JIRA\-1\] today`,
+			expected: "fixed [JIRA-1] today",
+		},
+		{
+			name:     "closing bracket before a colon stays escaped to not become a link definition",
+			input:    `\[JIRA\-1\]: done`,
+			expected: `[JIRA-1\]: done`,
+		},
+		{
+			name:     "closing bracket before a parenthesis stays escaped to not become a link",
+			input:    `\[text\](url)`,
+			expected: `[text\](url)`,
+		},
+		{
+			name:     "leading dash stays escaped to not become a list",
+			input:    `\- not a list`,
+			expected: `\- not a list`,
+		},
+		{
+			name:     "leading dashes",
+			input:    `\-\-\-`,
+			expected: `\---`,
+		},
+		{
+			name:     "leading plus stays escaped to not become a list",
+			input:    `\+ not a list`,
+			expected: `\+ not a list`,
+		},
+		{
+			name:     "leading hash stays escaped to not become a heading",
+			input:    `\# not a heading`,
+			expected: `\# not a heading`,
+		},
+		{
+			name:     "dash after a list marker",
+			input:    "* \\- not nested\n",
+			expected: "- \\- not nested\n",
+		},
+		{
+			name:     "backslash that does not escape anything",
+			input:    `C:\dir\file`,
+			expected: `C:\dir\file`,
+		},
+		{
+			name:     "line break marker is left alone",
+			input:    `a\\b`,
+			expected: `a\\b`,
+		},
+		{
+			name:     "escape right after a line break marker",
+			input:    `a\\\-b`,
+			expected: `a\\-b`,
+		},
+		{
+			name:     "heading",
+			input:    `h1. re\-review`,
+			expected: "# re-review\n",
+		},
+		{
+			name:     "list item",
+			input:    `* re\-review`,
+			expected: "- re-review\n",
+		},
+		{
+			name:     "inside bold",
+			input:    `*re\-review*`,
+			expected: "**re-review**\n\n",
+		},
+		{
+			name:     "every line is unescaped",
+			input:    "* first\\-line\n* second\\-line",
+			expected: "- first-line\n- second-line\n",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.expected, Parse(tc.input))
+		})
+	}
+}
+
+func TestParseKeepsEscapesInCode(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "code block",
+			input:    "{code}\nre\\-x\n{code}",
+			expected: "\n```\nre\\-x\n```\n",
+		},
+		{
+			name:     "noformat block",
+			input:    "{noformat}\nre\\-x\n{noformat}",
+			expected: "\n```\nre\\-x\n```\n",
+		},
+		{
+			name:     "code block with a language",
+			input:    "{code:java}\nre\\-x\n{code}",
+			expected: "\n```java\nre\\-x\n```\n",
+		},
+		{
+			name:     "inline code",
+			input:    `{code}a\-b{code} z\-w`,
+			expected: "`a\\-b` z-w\n",
+		},
+		{
+			name:     "inline monospace",
+			input:    `x\-y {{a\-b}} z\-w`,
+			expected: `x-y {{a\-b}} z-w`,
+		},
+		{
+			name:     "code block opened inside monospace",
+			input:    "{{a {code} b}}\nre\\-x\n{code}",
+			expected: "{{a \n```\nre\\-x\n```\n",
+		},
+		{
+			name:     "text after a code block is unescaped again",
+			input:    "{code}\nre\\-x\n{code}\nafter\\-wards",
+			expected: "\n```\nre\\-x\n```\nafter-wards",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.expected, Parse(tc.input))
+		})
+	}
+}

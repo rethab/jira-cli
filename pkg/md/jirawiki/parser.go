@@ -81,7 +81,15 @@ var replacements = map[string]string{
 
 // Parse converts input string to Jira markdown.
 func Parse(input string) string {
-	return secondPass(firstPass(input))
+	lines := firstPass(input)
+
+	// Markers are private use runes. If the input already holds any, they
+	// could not be told apart from ours, so the escapes are left as they are.
+	if hasMarker(input) {
+		return secondPass(lines)
+	}
+
+	return restoreEscapes(secondPass(protectEscapes(lines)))
 }
 
 /*

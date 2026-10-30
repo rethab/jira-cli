@@ -65,3 +65,41 @@ func TestWorklogReportRenderCSVExcludesTotal(t *testing.T) {
 	w := NewWorklogReport(data, ListDisplayFormat{CSV: true})
 	assert.NoError(t, w.Render())
 }
+
+func TestIssueWorklogsRenderUnescapesWikiMarkup(t *testing.T) {
+	var b bytes.Buffer
+
+	data := []jira.Worklog{
+		{
+			ID:        "10001",
+			Started:   "2026-01-14T09:00:00.000-0500",
+			TimeSpent: "15m",
+			Author:    jira.WorklogAuthor{Name: "Person A"},
+			Comment:   `re\-reviewed enterprise rename fix in migration`,
+		},
+	}
+
+	w := NewIssueWorklogs(data, ListDisplayFormat{}, WithListWriter(&b))
+	assert.NoError(t, w.Render())
+
+	expected := `ID	DATE	TIME SPENT	AUTHOR	COMMENT
+10001	2026-01-14	15m	Person A	re-reviewed enterprise rename fix in migration
+`
+	assert.Equal(t, expected, b.String())
+}
+
+func TestWorklogReportRenderUnescapesWikiMarkup(t *testing.T) {
+	var b bytes.Buffer
+
+	data := []WorklogReportEntry{
+		{IssueKey: "TEST-1", ID: "10001", IssueSummary: "Fix the thing", TimeSpent: "15m", TimeSpentSeconds: 900, Comment: `re\-reviewed enterprise rename fix in migration`},
+	}
+
+	w := NewWorklogReport(data, ListDisplayFormat{}, WithListWriter(&b))
+	assert.NoError(t, w.Render())
+
+	expected := "ISSUE\tID\tSUMMARY\tTIME SPENT\tCOMMENT\n" +
+		"TEST-1\t10001\tFix the thing\t15m\tre-reviewed enterprise rename fix in migration\n" +
+		"TOTAL\t\t\t0h 15m\t\n"
+	assert.Equal(t, expected, b.String())
+}
