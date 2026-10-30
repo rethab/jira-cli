@@ -255,3 +255,60 @@ func TestToJiraMDPreservesMentions(t *testing.T) {
 		})
 	}
 }
+
+func TestFromJiraMDUnescapesWikiEscapes(t *testing.T) {
+	assert.Equal(t,
+		"re-reviewed enterprise rename fix in migration",
+		FromJiraMD(`re\-reviewed enterprise rename fix in migration`),
+	)
+}
+
+// Editing converts the stored wiki markup to markdown for the editor and back
+// on submit. The wiki written the second time must equal the first, otherwise
+// every edit would add backslashes or drop characters.
+func TestJiraMDEditRoundTripIsStable(t *testing.T) {
+	inputs := []string{
+		"re-reviewed enterprise rename fix in migration",
+		"snake_case_name and __init__ and _private_",
+		"2 * 3 = 6 and 2*3",
+		`\*not bold\* and \_not italic\_`,
+		"[JIRA-1] done and [JIRA-1]: done",
+		`\[text\](not a link)`,
+		`\- not a list`,
+		`\+ not a list`,
+		`\# not a heading`,
+		"1 + 1, c++, x^2, (parenthetical), hello!, what?",
+		`\~\~not struck\~\~ and a ~tilde`,
+		"a|b",
+		"- a real list\n- re-review",
+		"`code-with-dash` and *emphasis-with-dash*",
+		"```\ncode-block\n```",
+	}
+
+	for _, in := range inputs {
+		t.Run(in, func(t *testing.T) {
+			first := ToJiraMD(in)
+			second := ToJiraMD(FromJiraMD(first))
+
+			assert.Equal(t, first, second)
+		})
+	}
+}
+
+func TestFromJiraMDKeepsMeaningOfEscapedMarkdown(t *testing.T) {
+	// Each wiki text below holds literal characters, so the markdown must not
+	// parse them as markup: converting it back to wiki must not produce any.
+	inputs := []string{
+		`\*not bold\*`,
+		`\_not italic\_`,
+		`\- not a list`,
+		`\# not a heading`,
+		`\[text\](not a link)`,
+	}
+
+	for _, in := range inputs {
+		t.Run(in, func(t *testing.T) {
+			assert.Equal(t, in, ToJiraMD(FromJiraMD(in)))
+		})
+	}
+}
