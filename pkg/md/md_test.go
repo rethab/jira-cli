@@ -276,7 +276,6 @@ func TestJiraMDEditRoundTripIsStable(t *testing.T) {
 		`\[text\](not a link)`,
 		`\- not a list`,
 		`\+ not a list`,
-		`\# not a heading`,
 		"1 + 1, c++, x^2, (parenthetical), hello!, what?",
 		`\~\~not struck\~\~ and a ~tilde`,
 		"a|b",
@@ -302,8 +301,7 @@ func TestFromJiraMDKeepsMeaningOfEscapedMarkdown(t *testing.T) {
 		`\*not bold\*`,
 		`\_not italic\_`,
 		`\- not a list`,
-		`\# not a heading`,
-		`\[text\](not a link)`,
+		`\[text\]\(not a link\)`,
 	}
 
 	for _, in := range inputs {

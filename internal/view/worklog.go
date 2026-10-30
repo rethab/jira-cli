@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/rethab/jira-cli/pkg/jira"
+	"github.com/rethab/jira-cli/pkg/md"
 	"github.com/rethab/jira-cli/pkg/tui"
 )
 
@@ -34,7 +35,7 @@ func (w *IssueWorklogs) data() tui.TableData {
 	data := make(tui.TableData, 1, 1+len(w.Data))
 	data[0] = []string{"ID", "DATE", "TIME SPENT", "AUTHOR", "COMMENT"}
 	for _, wl := range w.Data {
-		data = append(data, []string{wl.ID, dateOnly(wl.Started), wl.TimeSpent, wl.Author.Name, oneLine(wl.Comment)})
+		data = append(data, []string{wl.ID, dateOnly(wl.Started), wl.TimeSpent, wl.Author.Name, worklogComment(wl.Comment)})
 	}
 	return data
 }
@@ -74,7 +75,7 @@ func (w *WorklogReport) data() tui.TableData {
 	data := make(tui.TableData, 1, 1+len(w.Data))
 	data[0] = []string{"ISSUE", "ID", "SUMMARY", "TIME SPENT", "COMMENT"}
 	for _, e := range w.Data {
-		data = append(data, []string{e.IssueKey, e.ID, oneLine(e.IssueSummary), e.TimeSpent, oneLine(e.Comment)})
+		data = append(data, []string{e.IssueKey, e.ID, oneLine(e.IssueSummary), e.TimeSpent, worklogComment(e.Comment)})
 	}
 	return data
 }
@@ -96,6 +97,14 @@ func dateOnly(started string) string {
 		return started
 	}
 	return started[:dateLen]
+}
+
+// worklogComment renders a worklog comment, which Jira stores as wiki markup,
+// on a single line. The trailing blank lines work around the wiki parser
+// dropping the line break before the last line of a text without markup, which
+// would glue the last two words of a multi-line comment together.
+func worklogComment(comment string) string {
+	return oneLine(md.FromJiraMD(comment + "\n\n"))
 }
 
 // oneLine collapses a worklog comment to a single line so it doesn't break
