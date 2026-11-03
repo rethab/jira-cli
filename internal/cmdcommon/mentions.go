@@ -2,6 +2,7 @@ package cmdcommon
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/viper"
@@ -20,10 +21,6 @@ const mentionSearchLimit = 20
 // when there is no issue yet. With noInput, an ambiguous reference is an error
 // instead of a prompt.
 func ResolveMentions(client *jira.Client, issueKey, project, body string, noInput bool) string {
-	if !mention.Has(body) {
-		return body
-	}
-
 	lookup := func(query string) ([]*jira.User, error) {
 		s := cmdutil.Info(fmt.Sprintf("Looking up %s", query))
 		defer s.Stop()
@@ -45,6 +42,10 @@ func ResolveMentions(client *jira.Client, issueKey, project, body string, noInpu
 	local := viper.GetString("installation") == jira.InstallationTypeLocal
 
 	out, err := mention.Resolve(body, local, lookup, pick)
+	if err != nil && !noInput {
+		// The body may have been typed in the editor, and exiting would lose it.
+		_, _ = fmt.Fprintf(os.Stderr, "Nothing was sent. The text was:\n\n%s\n\n", body)
+	}
 	cmdutil.ExitIfError(err)
 
 	return out
@@ -54,10 +55,7 @@ func pickMention(query string, candidates []*jira.User) (*jira.User, error) {
 	labels := make([]string, 0, len(candidates))
 	seen := make(map[string]int)
 	for _, u := range candidates {
-		label := u.DisplayName
-		if u.Email != "" {
-			label += " <" + u.Email + ">"
-		}
+		label := mention.Label(u)
 		labels = append(labels, label)
 		seen[label]++
 	}
@@ -68,11 +66,7 @@ func pickMention(query string, candidates []*jira.User) (*jira.User, error) {
 	for i, u := range candidates {
 		label := labels[i]
 		if seen[label] > 1 {
-			id := u.AccountID
-			if id == "" {
-				id = u.Name
-			}
-			label += " (" + id + ")"
+			label += " (" + mention.ID(u) + ")"
 		}
 		options = append(options, label)
 	}

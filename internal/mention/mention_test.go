@@ -43,7 +43,7 @@ func TestResolveOutput(t *testing.T) {
 		{name: "exact by email", body: "@[JANE@example.com]", users: []*jira.User{janet, jane}, want: "[~accountid:acc-jane]"},
 		{name: "exact by username on local", body: "@[jane]", local: true, users: []*jira.User{janet, jane}, want: "[~jane]"},
 		{name: "single fuzzy result", body: "@[jane@elsewhere.com]", users: []*jira.User{hidden}, want: "[~accountid:acc-hidden]"},
-		{name: "inactive ignored", body: "@[Jane]", users: []*jira.User{gone, janet}, want: "[~accountid:acc-janet]"},
+		{name: "inactive ignored", body: "@[Janet Roe]", users: []*jira.User{gone, janet}, want: "[~accountid:acc-janet]"},
 		{name: "query is trimmed", body: "@[ Jane Doe ]", users: []*jira.User{jane}, want: "[~accountid:acc-jane]"},
 	}
 
@@ -71,10 +71,14 @@ func TestResolveSkipsCodeAndLinks(t *testing.T) {
 		{name: "indented code", body: "text\n\n    @[Jane Doe]\n\nafter @[Jane Doe]", want: "text\n\n    @[Jane Doe]\n\nafter [~accountid:acc-jane]"},
 		{name: "tab indented code", body: "\t@[Jane Doe]", want: "\t@[Jane Doe]"},
 		{name: "indented continuation is not code", body: "text\n    @[Jane Doe]", want: "text\n    [~accountid:acc-jane]"},
+		{name: "indented list paragraph is not code", body: "- item\n\n    @[Jane Doe]", want: "- item\n\n    [~accountid:acc-jane]"},
+		{name: "indented code after a list", body: "- item\n\ntext\n\n    @[Jane Doe]", want: "- item\n\ntext\n\n    @[Jane Doe]"},
+		{name: "indented code after a fence", body: "```\nx\n```\n    @[Jane Doe]", want: "```\nx\n```\n    @[Jane Doe]"},
 		{name: "inline code", body: "use `@[Jane Doe]` or @[Jane Doe]", want: "use `@[Jane Doe]` or [~accountid:acc-jane]"},
 		{name: "double backtick code", body: "``a ` @[Jane Doe]`` @[Jane Doe]", want: "``a ` @[Jane Doe]`` [~accountid:acc-jane]"},
 		{name: "unclosed backtick is text", body: "a ` @[Jane Doe]", want: "a ` [~accountid:acc-jane]"},
 		{name: "markdown link", body: "see @[docs](https://example.com)", want: "see @[docs](https://example.com)"},
+		{name: "markdown reference link", body: "see @[docs][1]", want: "see @[docs][1]"},
 		{name: "escaped", body: `\@[Jane Doe]`, want: `\@[Jane Doe]`},
 		{name: "existing markup", body: "[~accountid:other] and @[Jane Doe]", want: "[~accountid:other] and [~accountid:acc-jane]"},
 		{name: "nested bracket", body: "@[a [b] c]", want: "@[a [b] c]"},
@@ -116,12 +120,30 @@ func TestResolveErrors(t *testing.T) {
 		assert.EqualError(t, err, "no user found for mention @[Jane Gone]")
 	})
 
+	t.Run("a single partial name match is not accepted without asking", func(t *testing.T) {
+		doerr := &jira.User{AccountID: "acc-doerr", DisplayName: "Jane Doerr", Active: true}
+		lookup, _ := lookupOf(doerr)
+
+		_, err := Resolve("@[Jane Doe]", false, lookup, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Jane Doerr (acc-doerr)")
+
+		var offered []*jira.User
+		got, err := Resolve("@[Jane Doe]", false, lookup, func(_ string, c []*jira.User) (*jira.User, error) {
+			offered = c
+			return c[0], nil
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "[~accountid:acc-doerr]", got)
+		assert.Equal(t, []*jira.User{doerr}, offered)
+	})
+
 	t.Run("ambiguous without pick lists the candidates", func(t *testing.T) {
 		lookup, _ := lookupOf(jane, janet)
 
 		_, err := Resolve("@[Jan]", false, lookup, nil)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "mention @[Jan] is ambiguous")
+		assert.Contains(t, err.Error(), "mention @[Jan] doesn't match one user exactly")
 		assert.Contains(t, err.Error(), "\n  Jane Doe <jane@example.com> (acc-jane)\n  Janet Roe (acc-janet)")
 	})
 
@@ -213,9 +235,20 @@ func TestResolvePick(t *testing.T) {
 	})
 }
 
-func TestHas(t *testing.T) {
-	assert.True(t, Has("hi @[Jane]"))
-	assert.False(t, Has("hi @Jane"))
-	assert.False(t, Has("`@[Jane]`"))
-	assert.False(t, Has(""))
+func TestEscape(t *testing.T) {
+	cases := map[string]string{
+		"hi @[Jane] and @[Bob]": `hi @\[Jane] and @\[Bob]`,
+		"hi @Jane":              "hi @Jane",
+		"`@[Jane]`":             "`@[Jane]`",
+		"":                      "",
+	}
+
+	for body, want := range cases {
+		t.Run(body, func(t *testing.T) {
+			got := Escape(body)
+
+			assert.Equal(t, want, got)
+			assert.Empty(t, find(got))
+		})
+	}
 }

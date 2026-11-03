@@ -156,7 +156,7 @@ func askBody(client *jira.Client, issueKey, commentID string) string {
 		Prompt: &surveyext.JiraEditor{
 			Editor: &survey.Editor{
 				Message:       "Comment body",
-				Default:       cmdcommon.CommentEditorBody(existing.Body),
+				Default:       cmdcommon.EditorBody(existing.Body),
 				HideDefault:   true,
 				AppendDefault: true,
 			},

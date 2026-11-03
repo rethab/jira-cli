@@ -484,8 +484,8 @@ $ jira issue create -s"Follow-up" -tTask -b"Blocked by https://example.atlassian
 ##### Mentions
 Write `@[Name]` in a description or comment to mention a user. The name can be a display name, an email address or, on
 Server/Data Center, a username. It is looked up among the users who can see the issue (the project, when creating one)
-and replaced with a real mention that notifies them. If several users match you are asked to choose, and in
-non-interactive mode (`--no-input`, standard input) the command fails and lists them, so give a more exact name or an
+and replaced with a real mention that notifies them. If several users match, or the only match isn't exact (`@[Jane Doe]`
+finding just "Jane Doerr"), you are asked to choose, and in non-interactive mode (`--no-input`, standard input) the command fails and lists them, so give a more exact name or an
 email. A mention that matches no active user is an error, and nothing is sent. `@[...]` inside code and Markdown links
 (`@[text](url)`) is left alone, and so are existing `[~...]` mentions. The same works in `jira issue edit`,
 `jira epic create`, `jira issue comment add` and `jira issue comment edit`.
@@ -495,7 +495,8 @@ $ jira issue create -s"Flaky test" -tBug -b"@[Jane Doe] can you look at this?"
 ```
 
 When editing, existing mentions are kept in the editor as `[~accountid:...]` (Cloud) or `[~username]`
-(Server/Data Center), so saving doesn't turn them into plain text.
+(Server/Data Center), so saving doesn't turn them into plain text. Text that already reads `@[...]` is shown as
+`@\[...]`, so saving doesn't turn it into a mention.
 
 #### Edit
 The `edit` command lets you edit an issue.
@@ -736,7 +737,8 @@ $ jira issue comment add ISSUE-1 "Thanks, fixed" --reply-to 10042
 ```
 
 `--reply-to` posts a new top-level comment that starts with a mention of the author of the original comment and a short
-quote of it. It is not a threaded reply: Jira's REST API has no parent comment field. The reply keeps the visibility of
+quote of it. Mentions inside the quote are shown as plain names, so only the author is notified. It is not a threaded
+reply: Jira's REST API has no parent comment field. The reply keeps the visibility of
 the comment it answers, so an internal comment, or one restricted to a group or role, is not answered in public.
 
 > [!NOTE]

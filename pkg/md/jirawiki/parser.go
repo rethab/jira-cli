@@ -213,12 +213,31 @@ func secondPass(lines []string) string {
 
 // separatesPlainLines reports whether a newline follows the plain line before
 // lines[next]. The last line gets none, but the one before it has to, or it is
-// glued to the last when that has no markup either.
+// glued to the last, unless the last opens with a block that writes its own
+// line break or that is kept on the line as it is.
 func separatesPlainLines(lines []string, next int) bool {
 	if next < len(lines)-1 {
 		return true
 	}
-	return next == len(lines)-1 && len(tokenize(lines[next])) == 0
+	if next != len(lines)-1 {
+		return false
+	}
+
+	tokens := tokenize(lines[next])
+	for _, t := range tokens {
+		if t.startIdx != 0 {
+			continue
+		}
+		switch t.family {
+		case typeTagInlineQuote, typeTagOther, typeTagTable:
+			return false
+		case typeTagFencedCode:
+			_, inline := inlineClosingToken(t, tokens)
+			return inline
+		}
+		return true
+	}
+	return true
 }
 
 // Mark tokens in a given string.

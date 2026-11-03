@@ -12,9 +12,15 @@ import (
 // ErrInvalidSearchOption denotes invalid search option was given.
 var ErrInvalidSearchOption = fmt.Errorf("invalid search option")
 
-const (
-	userAssignablePath = "/user/assignable/search"
-	userViewIssuePath  = "/user/viewissue/search"
+// userSearchEndpoint is a user search path and the query parameter it takes the
+// project key by, which differs between the endpoints.
+type userSearchEndpoint struct {
+	path, projectParam string
+}
+
+var (
+	userAssignableSearch = userSearchEndpoint{path: "/user/assignable/search", projectParam: "project"}
+	userViewIssueSearch  = userSearchEndpoint{path: "/user/viewissue/search", projectParam: "projectKey"}
 )
 
 // UserSearchOptions holds options to search for user.
@@ -53,7 +59,7 @@ func (c *Client) UserSearchV2(opt *UserSearchOptions) ([]*User, error) {
 // GET /user/viewissue/search endpoint. Unlike the assignable search, it also finds users that can't
 // be assigned, which is what a mention needs. Either IssueKey or Project must be set.
 func (c *Client) UserSearchViewIssue(opt *UserSearchOptions) ([]*User, error) {
-	return c.userSearchAt(opt, apiVersion3, userViewIssuePath)
+	return c.userSearchAt(opt, apiVersion3, userViewIssueSearch)
 }
 
 // UserSearchViewIssueV2 search for users that can view an issue or a project using v2 version of the
@@ -68,14 +74,14 @@ func (c *Client) UserSearchViewIssueV2(opt *UserSearchOptions) ([]*User, error) 
 		}
 		opt = &cp
 	}
-	return c.userSearchAt(opt, apiVersion2, userViewIssuePath)
+	return c.userSearchAt(opt, apiVersion2, userViewIssueSearch)
 }
 
 func (c *Client) userSearch(opt *UserSearchOptions, ver string) ([]*User, error) {
-	return c.userSearchAt(opt, ver, userAssignablePath)
+	return c.userSearchAt(opt, ver, userAssignableSearch)
 }
 
-func (c *Client) userSearchAt(opt *UserSearchOptions, ver, endpoint string) ([]*User, error) {
+func (c *Client) userSearchAt(opt *UserSearchOptions, ver string, endpoint userSearchEndpoint) ([]*User, error) {
 	if opt == nil {
 		return nil, ErrInvalidSearchOption
 	}
@@ -87,12 +93,7 @@ func (c *Client) userSearchAt(opt *UserSearchOptions, ver, endpoint string) ([]*
 	)
 
 	if opt.Project != "" {
-		// The viewissue endpoint calls it projectKey, assignable calls it project.
-		param := "project"
-		if endpoint == userViewIssuePath {
-			param = "projectKey"
-		}
-		opts = append(opts, fmt.Sprintf("%s=%s", param, opt.Project))
+		opts = append(opts, fmt.Sprintf("%s=%s", endpoint.projectParam, opt.Project))
 	}
 	if opt.IssueKey != "" {
 		opts = append(opts, fmt.Sprintf("issueKey=%s", opt.IssueKey))
@@ -116,7 +117,7 @@ func (c *Client) userSearchAt(opt *UserSearchOptions, ver, endpoint string) ([]*
 		return nil, ErrInvalidSearchOption
 	}
 
-	path := fmt.Sprintf("%s?%s", endpoint, strings.Join(opts, "&"))
+	path := fmt.Sprintf("%s?%s", endpoint.path, strings.Join(opts, "&"))
 
 	switch ver {
 	case apiVersion2:

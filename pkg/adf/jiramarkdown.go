@@ -22,10 +22,23 @@ const (
 // JiraMarkdownTranslator is a jira markdown translator.
 type JiraMarkdownTranslator struct {
 	*MarkdownTranslator
+	plainMentions bool
+}
+
+// JiraMarkdownOption customizes the jira markdown translator.
+type JiraMarkdownOption func(*JiraMarkdownTranslator)
+
+// WithPlainMentions renders mentions as the name they display instead of the
+// markup that pings the user, for text that is quoted rather than edited: the
+// people mentioned in the original shouldn't be notified again.
+func WithPlainMentions() JiraMarkdownOption {
+	return func(tr *JiraMarkdownTranslator) {
+		tr.plainMentions = true
+	}
 }
 
 // NewJiraMarkdownTranslator constructs jira markdown translator.
-func NewJiraMarkdownTranslator() *JiraMarkdownTranslator {
+func NewJiraMarkdownTranslator(opts ...JiraMarkdownOption) *JiraMarkdownTranslator {
 	openHooks := nodeTypeHook{
 		NodePanel:      nodePanelOpenHook,
 		InlineNodeCard: inlineCardOpenHook,
@@ -35,17 +48,24 @@ func NewJiraMarkdownTranslator() *JiraMarkdownTranslator {
 		NodePanel: nodePanelCloseHook,
 	}
 
-	return &JiraMarkdownTranslator{
+	tr := &JiraMarkdownTranslator{
 		MarkdownTranslator: NewMarkdownTranslator(
 			WithMarkdownOpenHooks(openHooks),
 			WithMarkdownCloseHooks(closeHooks),
 		),
 	}
+	for _, opt := range opts {
+		opt(tr)
+	}
+	return tr
 }
 
 // Open implements TagOpener interface.
 func (tr *JiraMarkdownTranslator) Open(n Connector, d int) string {
 	if n.GetType() == InlineNodeMention {
+		if tr.plainMentions {
+			return mentionText(n)
+		}
 		return mentionMarkup(n)
 	}
 	return tr.MarkdownTranslator.Open(n, d)
@@ -66,6 +86,11 @@ func mentionMarkup(n Connector) string {
 	if id, _ := attrs["id"].(string); id != "" {
 		return " [~accountid:" + id + "]"
 	}
+	return mentionText(n)
+}
+
+func mentionText(n Connector) string {
+	attrs, _ := n.GetAttributes().(map[string]any)
 	text, _ := attrs["text"].(string)
 	return " " + text
 }

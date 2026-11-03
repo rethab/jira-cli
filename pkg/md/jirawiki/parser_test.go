@@ -545,7 +545,7 @@ func main() {
 6
 7
 {code}x{code}`,
-			expected: "1\n2\n3\n4\n5\n6\n7`x`\n",
+			expected: "1\n2\n3\n4\n5\n6\n7\n`x`\n",
 		},
 		{
 			name: "inline noformat on the last line should not cause infinite loop #1033",
@@ -557,7 +557,7 @@ func main() {
 6
 7
 {noformat}x{noformat}`,
-			expected: "1\n2\n3\n4\n5\n6\n7`x`\n",
+			expected: "1\n2\n3\n4\n5\n6\n7\n`x`\n",
 		},
 		{
 			name: "inline code within text on the last line should not cause infinite loop #1033",
@@ -569,7 +569,7 @@ Line 5
 Line 6
 Line 7
 See {code}SomeName{code} for details.`,
-			expected: "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7See `SomeName` for details.\n",
+			expected: "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nSee `SomeName` for details.\n",
 		},
 		{
 			name: "unclosed code block on the last line should not cause infinite loop #1033",
@@ -897,6 +897,9 @@ func TestParseKeepsLinesApart(t *testing.T) {
 	assert.Equal(t, "one\ntwo\nthree", Parse("one\ntwo\nthree"))
 	assert.Equal(t, "one\ntwo", Parse("one\ntwo"))
 	assert.Equal(t, "one\ntwo\nthree\nfour", Parse("one\r\ntwo\r\nthree\r\nfour"))
+	assert.Equal(t, "Thanks\n[~jdoe]\n", Parse("Thanks\n[~jdoe]"))
+	assert.Equal(t, "one\ntwo\n**three**\n\n", Parse("one\ntwo\n*three*"))
+	assert.Equal(t, "intro\n# Title\n", Parse("intro\nh1. Title"))
 }
 
 func TestParseKeepsMentions(t *testing.T) {
