@@ -45,12 +45,29 @@ func NewJiraMarkdownTranslator() *JiraMarkdownTranslator {
 
 // Open implements TagOpener interface.
 func (tr *JiraMarkdownTranslator) Open(n Connector, d int) string {
+	if n.GetType() == InlineNodeMention {
+		return mentionMarkup(n)
+	}
 	return tr.MarkdownTranslator.Open(n, d)
 }
 
 // Close implements TagCloser interface.
 func (tr *JiraMarkdownTranslator) Close(n Connector) string {
 	return tr.MarkdownTranslator.Close(n)
+}
+
+// mentionMarkup renders a mention as the wiki markup that pings the user. The
+// editor text is submitted back as the body, so printing the display name, as
+// the viewer does, would silently turn the mention into plain text on save.
+// Without an id there is nothing to ping, and the display name is all that is left.
+func mentionMarkup(n Connector) string {
+	attrs, _ := n.GetAttributes().(map[string]any)
+
+	if id, _ := attrs["id"].(string); id != "" {
+		return " [~accountid:" + id + "]"
+	}
+	text, _ := attrs["text"].(string)
+	return " " + text
 }
 
 // inlineCardOpenHook drops the pin the viewer prints before a card. The editor

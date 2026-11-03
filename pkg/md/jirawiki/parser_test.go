@@ -890,3 +890,29 @@ func TestParseKeepsEscapesInCode(t *testing.T) {
 		})
 	}
 }
+
+func TestParseKeepsLinesApart(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "one\ntwo\nthree", Parse("one\ntwo\nthree"))
+	assert.Equal(t, "one\ntwo", Parse("one\ntwo"))
+	assert.Equal(t, "one\ntwo\nthree\nfour", Parse("one\r\ntwo\r\nthree\r\nfour"))
+}
+
+func TestParseKeepsMentions(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]string{
+		"Thanks [~jdoe].": "Thanks [~jdoe].\n",
+		"[~accountid:5b10a2844c20165700ede21g] please look": "[~accountid:5b10a2844c20165700ede21g] please look\n",
+		"[~jdoe] see [title|https://ankit.pl]":              "[~jdoe] see [title](https://ankit.pl)\n",
+	}
+
+	for input, expected := range cases {
+		t.Run(input, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, expected, Parse(input))
+		})
+	}
+}

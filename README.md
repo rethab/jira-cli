@@ -73,6 +73,10 @@ Features not available upstream:
 - **Smart links for issue URLs**: on Jira Cloud, bare URLs of issues on your site (`<server>/browse/ABC-1`) in the body
   of `jira issue create`, `jira issue edit`, `jira issue comment add` and `comment edit` render as smart links showing the
   issue's summary and status. See [Create](#create).
+- **Mentions and replies**: `@[Name]` in the body of `jira issue create`, `edit`, `comment add` and `comment edit`, and of
+  `jira epic create`, resolves to a real mention, and `jira issue comment add --reply-to ID` mentions and quotes the
+  original comment. See [Mentions](#mentions) and [Comment](#comment).
+  ([upstream #407](https://github.com/ankitpokhrel/jira-cli/issues/407))
 - **Original estimate on edit**: `jira issue edit ISSUE-1 --original-estimate 2h` (`-e`) sets the original estimate of
   an existing issue, leaving the remaining estimate to Jira. See [Edit](#edit).
   ([upstream #801](https://github.com/ankitpokhrel/jira-cli/pull/801))
@@ -477,6 +481,22 @@ URL is not part of the link; write `<url>` if it should be.
 $ jira issue create -s"Follow-up" -tTask -b"Blocked by https://example.atlassian.net/browse/ABC-1 (see the thread)."
 ```
 
+##### Mentions
+Write `@[Name]` in a description or comment to mention a user. The name can be a display name, an email address or, on
+Server/Data Center, a username. It is looked up among the users who can see the issue (the project, when creating one)
+and replaced with a real mention that notifies them. If several users match you are asked to choose, and in
+non-interactive mode (`--no-input`, standard input) the command fails and lists them, so give a more exact name or an
+email. A mention that matches no active user is an error, and nothing is sent. `@[...]` inside code and Markdown links
+(`@[text](url)`) is left alone, and so are existing `[~...]` mentions. The same works in `jira issue edit`,
+`jira epic create`, `jira issue comment add` and `jira issue comment edit`.
+
+```sh
+$ jira issue create -s"Flaky test" -tBug -b"@[Jane Doe] can you look at this?"
+```
+
+When editing, existing mentions are kept in the editor as `[~accountid:...]` (Cloud) or `[~username]`
+(Server/Data Center), so saving doesn't turn them into plain text.
+
 #### Edit
 The `edit` command lets you edit an issue.
 
@@ -707,7 +727,17 @@ $ jira issue comment add ISSUE-1 --template -
 
 # Or, use pipe to read input directly from standard input
 $ echo "Comment from stdin" | jira issue comment add ISSUE-1
+
+# Mention a user, see Mentions under Create
+$ jira issue comment add ISSUE-1 "@[Jane Doe] can you take a look?"
+
+# Mention and quote the comment with the id 10042
+$ jira issue comment add ISSUE-1 "Thanks, fixed" --reply-to 10042
 ```
+
+`--reply-to` posts a new top-level comment that starts with a mention of the author of the original comment and a short
+quote of it. It is not a threaded reply: Jira's REST API has no parent comment field. The reply keeps the visibility of
+the comment it answers, so an internal comment, or one restricted to a group or role, is not answered in public.
 
 > [!NOTE]
 > For the comment body, the positional argument always takes precedence over the `--template` flag if both of them are passed. In the

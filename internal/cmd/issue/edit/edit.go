@@ -129,6 +129,8 @@ func edit(cmd *cobra.Command, args []string) {
 
 	cmdutil.ExitIfError(checkImageLoss(issue, params))
 
+	params.body = cmdcommon.ResolveMentions(client, params.issueKey, project, params.body, params.noInput)
+
 	edr := buildEditRequest(client, project, issue, params)
 	edr.WithCustomFields(customFields)
 

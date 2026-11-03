@@ -40,6 +40,21 @@ type Comment struct {
 	Properties   []CommentProperty  `json:"properties,omitempty"`
 }
 
+// IsInternal reports whether Jira Service Management marks the comment as
+// internal. It needs the comment to be fetched with its properties.
+func (c *Comment) IsInternal() bool {
+	for _, p := range c.Properties {
+		if p.Key != commentInternalProperty {
+			continue
+		}
+		var v issueCommentPropertyValue
+		if json.Unmarshal(p.Value, &v) == nil && v.Internal {
+			return true
+		}
+	}
+	return false
+}
+
 type commentPage struct {
 	StartAt    int       `json:"startAt"`
 	MaxResults int       `json:"maxResults"`

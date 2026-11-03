@@ -305,13 +305,19 @@ type issueCommentProperty struct {
 }
 type issueCommentRequest struct {
 	Body       string                 `json:"body"`
+	Visibility *CommentVisibility     `json:"visibility,omitempty"`
 	Properties []issueCommentProperty `json:"properties"`
 }
 
 // AddIssueComment adds comment to an issue using POST /issue/{key}/comment endpoint
-// and returns the created comment.
-func (c *Client) AddIssueComment(key, comment string, internal bool) (*Comment, error) {
-	body, err := json.Marshal(&issueCommentRequest{Body: c.ToJiraMD(comment), Properties: []issueCommentProperty{{Key: commentInternalProperty, Value: issueCommentPropertyValue{Internal: internal}}}})
+// and returns the created comment. A nil visibility leaves the comment visible to
+// everyone who can see the issue.
+func (c *Client) AddIssueComment(key, comment string, internal bool, visibility *CommentVisibility) (*Comment, error) {
+	body, err := json.Marshal(&issueCommentRequest{
+		Body:       c.ToJiraMD(comment),
+		Visibility: visibility,
+		Properties: []issueCommentProperty{{Key: commentInternalProperty, Value: issueCommentPropertyValue{Internal: internal}}},
+	})
 	if err != nil {
 		return nil, err
 	}

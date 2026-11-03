@@ -211,6 +211,16 @@ func ProxyUserSearch(c *jira.Client, opts *jira.UserSearchOptions) ([]*jira.User
 	return users, err
 }
 
+// ProxyUserSearchViewIssue uses either v2 or v3 version of the GET /user/viewissue/search
+// endpoint to search for the users that can view the given issue or project.
+// Defaults to v3 if installation type is not defined in the config.
+func ProxyUserSearchViewIssue(c *jira.Client, opts *jira.UserSearchOptions) ([]*jira.User, error) {
+	if viper.GetString("installation") == jira.InstallationTypeLocal {
+		return c.UserSearchViewIssueV2(opts)
+	}
+	return c.UserSearchViewIssue(opts)
+}
+
 // ProxyTransitions uses either v2 or v3 version of the GET /issue/{key}/transitions
 // endpoint to fetch valid transitions for an issue.
 // Defaults to v3 if installation type is not defined in the config.

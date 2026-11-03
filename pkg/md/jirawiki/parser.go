@@ -139,7 +139,7 @@ func secondPass(lines []string) string {
 			out.WriteString(line)
 
 			lineNum++
-			if lineNum < len(lines)-1 {
+			if separatesPlainLines(lines, lineNum) {
 				out.WriteByte(newLine)
 			}
 			continue
@@ -209,6 +209,16 @@ func secondPass(lines []string) string {
 	}
 
 	return out.String()
+}
+
+// separatesPlainLines reports whether a newline follows the plain line before
+// lines[next]. The last line gets none, but the one before it has to, or it is
+// glued to the last when that has no markup either.
+func separatesPlainLines(lines []string, next int) bool {
+	if next < len(lines)-1 {
+		return true
+	}
+	return next == len(lines)-1 && len(tokenize(lines[next])) == 0
 }
 
 // Mark tokens in a given string.
@@ -481,9 +491,14 @@ func (t *Token) handleReferenceLink(line string, out *strings.Builder) int {
 
 	var link string
 
-	if len(pieces) == 2 {
+	switch {
+	case len(pieces) == 1 && strings.HasPrefix(pieces[0], "~"):
+		// A user mention, which markdown has no syntax for. It is kept as is so
+		// that submitting the text pings the user again.
+		link = "[" + body + "]"
+	case len(pieces) == 2:
 		link = fmt.Sprintf("[%s](%s)", pieces[0], pieces[1])
-	} else {
+	default:
 		link = fmt.Sprintf("[](%s)", pieces[0])
 	}
 

@@ -15,7 +15,8 @@ import (
 	"github.com/rethab/jira-cli/pkg/md/jirawiki"
 )
 
-// mentionPattern matches Jira user mentions, e.g. [~displayname] or [~display name].
+// mentionPattern matches Jira user mentions, e.g. [~username] on Server/Data Center
+// or [~accountid:5b10a2844c20165700ede21g] on Cloud.
 var mentionPattern = regexp.MustCompile(`\[~[^\[\]\n]+\]`)
 
 // nonceSize is the number of random bytes used to build a mention placeholder nonce.

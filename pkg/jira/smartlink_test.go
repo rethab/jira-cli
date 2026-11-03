@@ -73,7 +73,7 @@ func TestAddIssueCommentSmartLinks(t *testing.T) {
 	// The server in the config is what decides which URLs are issues of this site.
 	client := NewClient(Config{Server: server.URL, Installation: InstallationTypeCloud}, WithTimeout(3*time.Second))
 
-	_, err := client.AddIssueComment("TEST-1", "Blocked by "+server.URL+"/browse/ABC-1.", false)
+	_, err := client.AddIssueComment("TEST-1", "Blocked by "+server.URL+"/browse/ABC-1.", false, nil)
 	require.NoError(t, err)
 	assert.Contains(t, body, `Blocked by [`+server.URL+`/browse/ABC-1|`+server.URL+`/browse/ABC-1|smart-link].`)
 }

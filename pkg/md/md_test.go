@@ -208,6 +208,11 @@ func TestToJiraMDPreservesMentions(t *testing.T) {
 			expected: "[~ankit]",
 		},
 		{
+			name:     "cloud account mention",
+			input:    `[~accountid:5b10a2844c20165700ede21g] hi`,
+			expected: "[~accountid:5b10a2844c20165700ede21g] hi",
+		},
+		{
 			name:     "mention with display name containing spaces",
 			input:    `[~display name with spaces]`,
 			expected: "[~display name with spaces]",
@@ -253,6 +258,15 @@ func TestToJiraMDPreservesMentions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.expected, ToJiraMD(tc.input))
 		})
+	}
+}
+
+func TestMentionsSurviveTheEditorRoundTrip(t *testing.T) {
+	for _, wiki := range []string{
+		"Hey [~jdoe], see [the docs|https://example.com].",
+		"* [~accountid:5b10a2844c20165700ede21g] please review",
+	} {
+		assert.Equal(t, wiki, ToJiraMD(FromJiraMD(wiki)))
 	}
 }
 
