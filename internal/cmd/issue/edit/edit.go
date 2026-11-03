@@ -14,7 +14,6 @@ import (
 	"github.com/rethab/jira-cli/internal/query"
 	"github.com/rethab/jira-cli/pkg/adf"
 	"github.com/rethab/jira-cli/pkg/jira"
-	"github.com/rethab/jira-cli/pkg/md"
 	"github.com/rethab/jira-cli/pkg/surveyext"
 )
 
@@ -129,6 +128,8 @@ func edit(cmd *cobra.Command, args []string) {
 
 	cmdutil.ExitIfError(checkImageLoss(issue, params))
 
+	params.body = cmdcommon.ResolveMentions(client, params.issueKey, project, params.body, params.noInput)
+
 	edr := buildEditRequest(client, project, issue, params)
 	edr.WithCustomFields(customFields)
 
@@ -155,13 +156,7 @@ func edit(cmd *cobra.Command, args []string) {
 // Server as wiki markup, so both have to be translated to markdown first, otherwise
 // an unchanged Server description would be re-interpreted as markdown on submit.
 func editorBody(issue *jira.Issue) string {
-	if issue.Fields.Description == nil {
-		return ""
-	}
-	if adfBody, ok := issue.Fields.Description.(*adf.ADF); ok {
-		return adf.NewTranslator(adfBody, adf.NewJiraMarkdownTranslator()).Translate()
-	}
-	return md.FromJiraMD(issue.Fields.Description.(string))
+	return cmdcommon.EditorBody(issue.Fields.Description)
 }
 
 // The editor renders media as a "[attachment]" placeholder and the description is

@@ -565,14 +565,14 @@ func TestAddIssueComment(t *testing.T) {
 
 	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
 
-	comment, err := client.AddIssueComment("TEST-1", "comment", false)
+	comment, err := client.AddIssueComment("TEST-1", "comment", false, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, "10042", comment.ID)
 	assert.Equal(t, "Person A", comment.Author.DisplayName)
 
 	unexpectedStatusCode = true
 
-	_, err = client.AddIssueComment("TEST-1", "comment", false)
+	_, err = client.AddIssueComment("TEST-1", "comment", false, nil)
 	assertUnexpectedResponse(t, err)
 }
 
@@ -862,4 +862,26 @@ func TestWatchIssue(t *testing.T) {
 
 	err = client.WatchIssueV2("TEST-1", "a12b3")
 	assertUnexpectedResponse(t, err)
+}
+
+func TestAddIssueCommentWithVisibility(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		actualBody := new(strings.Builder)
+		_, _ = io.Copy(actualBody, r.Body)
+
+		assert.JSONEq(t,
+			`{"body":"reply","visibility":{"type":"role","value":"Developers","identifier":"10002"},"properties":[{"key":"sd.public.comment","value":{"internal":true}}]}`,
+			actualBody.String(),
+		)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(201)
+		_, _ = w.Write([]byte(`{"id":"10043"}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+	_, err := client.AddIssueComment("TEST-1", "reply", true, &CommentVisibility{Type: "role", Value: "Developers", Identifier: "10002"})
+	assert.NoError(t, err)
 }

@@ -232,3 +232,15 @@ func TestDeleteIssueComment(t *testing.T) {
 	err = client.DeleteIssueComment("TEST-1", "10")
 	assertUnexpectedResponse(t, err)
 }
+
+func TestCommentIsInternal(t *testing.T) {
+	prop := func(key, value string) CommentProperty {
+		return CommentProperty{Key: key, Value: json.RawMessage(value)}
+	}
+
+	assert.True(t, (&Comment{Properties: []CommentProperty{prop("sd.public.comment", `{"internal":true}`)}}).IsInternal())
+	assert.False(t, (&Comment{Properties: []CommentProperty{prop("sd.public.comment", `{"internal":false}`)}}).IsInternal())
+	assert.False(t, (&Comment{Properties: []CommentProperty{prop("other", `{"internal":true}`)}}).IsInternal())
+	assert.False(t, (&Comment{Properties: []CommentProperty{prop("sd.public.comment", `"nonsense"`)}}).IsInternal())
+	assert.False(t, (&Comment{}).IsInternal())
+}

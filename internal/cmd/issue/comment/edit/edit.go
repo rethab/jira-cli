@@ -10,9 +10,7 @@ import (
 	"github.com/rethab/jira-cli/api"
 	"github.com/rethab/jira-cli/internal/cmdcommon"
 	"github.com/rethab/jira-cli/internal/cmdutil"
-	"github.com/rethab/jira-cli/pkg/adf"
 	"github.com/rethab/jira-cli/pkg/jira"
-	"github.com/rethab/jira-cli/pkg/md"
 	"github.com/rethab/jira-cli/pkg/surveyext"
 )
 
@@ -118,6 +116,8 @@ func edit(cmd *cobra.Command, args []string) {
 		body = askBody(client, issueKey, commentID)
 	}
 
+	body = cmdcommon.ResolveMentions(client, issueKey, "", body, noInput)
+
 	if !noInput {
 		answer := struct{ Action string }{}
 		cmdutil.ExitIfError(survey.Ask([]*survey.Question{nextAction()}, &answer))
@@ -156,7 +156,7 @@ func askBody(client *jira.Client, issueKey, commentID string) string {
 		Prompt: &surveyext.JiraEditor{
 			Editor: &survey.Editor{
 				Message:       "Comment body",
-				Default:       editorBody(existing.Body),
+				Default:       cmdcommon.EditorBody(existing.Body),
 				HideDefault:   true,
 				AppendDefault: true,
 			},
@@ -166,18 +166,6 @@ func askBody(client *jira.Client, issueKey, commentID string) string {
 	cmdutil.ExitIfError(survey.Ask(qs, &ans))
 
 	return ans.Body
-}
-
-// editorBody translates the body like 'jira issue edit' does for a description:
-// Cloud serves ADF and Server/Data Center wiki markup, and the v2 wiki rendering
-// of Cloud's ADF has escapes and smart-link forms FromJiraMD doesn't undo. A
-// smart link comes out as its bare URL, which the submit turns back into one.
-func editorBody(body any) string {
-	if doc, ok := body.(*adf.ADF); ok {
-		return adf.NewTranslator(doc, adf.NewJiraMarkdownTranslator()).Translate()
-	}
-	s, _ := body.(string)
-	return md.FromJiraMD(s)
 }
 
 func nextAction() *survey.Question {

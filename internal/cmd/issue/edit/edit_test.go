@@ -49,7 +49,7 @@ func TestEditorBodyIsMarkdown(t *testing.T) {
 		{
 			name:        "on-prem/server wiki markup is translated to markdown",
 			description: "h1. Heading\n\nSome *bold* text",
-			want:        "# Heading\nSome **bold** text\n",
+			want:        "# Heading\n\nSome **bold** text\n",
 		},
 		{
 			name: "cloud ADF is translated to markdown",
@@ -92,7 +92,7 @@ func TestServerInteractiveEditRoundTrip(t *testing.T) {
 	issue := &jira.Issue{Fields: jira.IssueFields{Description: wiki}}
 
 	prefilled := editorBody(issue)
-	assert.Equal(t, "## Heading\n\n- first ordered item\n- second ordered item\nSome **bold wiki** text\n", prefilled)
+	assert.Equal(t, "## Heading\n\n- first ordered item\n- second ordered item\n\nSome **bold wiki** text\n", prefilled)
 
 	// The user edits a single word in $EDITOR and saves.
 	edited := strings.Replace(prefilled, "Heading", "Updated heading", 1)
@@ -101,7 +101,7 @@ func TestServerInteractiveEditRoundTrip(t *testing.T) {
 
 	assert.Equal(
 		t,
-		"h2. Updated heading\n* first ordered item\n* second ordered item\nSome *bold wiki* text",
+		"h2. Updated heading\n* first ordered item\n* second ordered item\n\nSome *bold wiki* text",
 		edr.Body,
 	)
 	assert.NotContains(t, edr.Body, "h1.", "wiki ordered list items must not become headings")
