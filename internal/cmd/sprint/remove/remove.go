@@ -1,7 +1,6 @@
 package remove
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -48,9 +47,16 @@ func remove(_ *cobra.Command, args []string) {
 		err := survey.Ask(qs, &ans)
 		cmdutil.ExitIfError(err)
 
-		issues := strings.Split(ans.Issues, ",")
-		for i, iss := range issues {
-			issues[i] = cmdutil.GetJiraIssueKey(project, strings.TrimSpace(iss))
+		parts := strings.Split(ans.Issues, ",")
+		issues := make([]string, 0, len(parts))
+		for _, iss := range parts {
+			// A trailing comma or blank entry would send an empty key, and Jira rejects the whole batch.
+			if iss = strings.TrimSpace(iss); iss != "" {
+				issues = append(issues, cmdutil.GetJiraIssueKey(project, iss))
+			}
+		}
+		if len(issues) == 0 {
+			cmdutil.Failed("No issue keys given")
 		}
 		params.issues = issues
 	}
@@ -63,7 +69,7 @@ func remove(_ *cobra.Command, args []string) {
 	}()
 	cmdutil.ExitIfError(err)
 
-	cmdutil.Success(fmt.Sprintf("Issues moved to the backlog\n%s", cmdutil.GenerateServerBrowseURL(server, project)))
+	cmdutil.Success("Issues moved to the backlog\n%s", cmdutil.GenerateServerBrowseURL(server, project))
 }
 
 func parseFlags(args []string, project string) *removeParams {
