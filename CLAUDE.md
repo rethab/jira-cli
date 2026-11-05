@@ -36,9 +36,14 @@ from upstream, so keep it accurate.
 When a change adds a user-facing feature that upstream doesn't have (a new command, flag, or visible behavior), the
 same PR must:
 
-- Add a bullet to "Additional features": a bold short name, the command or flag, one sentence on what it does, and a
-  link to the upstream issue or PR (`([upstream #N](https://github.com/ankitpokhrel/jira-cli/issues/N))`) if one exists.
+- Add a bullet to "Additional features" under the group it belongs to: **New commands**, **New flags** (on an
+  existing command), or **Behavior** (anything visible without a new command or flag). Keep it to one line, or two at
+  most: the command or flag, then a few words on what it does. The details belong under "Commands", not here. If an
+  existing bullet covers the same command, extend that one instead.
+- If an upstream issue or PR asks for the feature, end the bullet with `[#N]` and add
+  `[#N]: https://github.com/ankitpokhrel/jira-cli/issues/N` (or `/pull/N`) to the link list at the end of the
+  section, sorted by number.
 - Document the usage in the matching section under "Commands", like any other feature.
 
 Bug fixes, dependency bumps, and CI changes don't get a bullet. If upstream ships a listed feature and we pick it up,
-remove the bullet.
+remove the bullet and its link entry.

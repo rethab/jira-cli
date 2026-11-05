@@ -36,69 +36,60 @@ casks, and Docker images are published from this repository (see [Installation](
 
 ### Additional features
 
-Features not available upstream:
+Features not available upstream. Each is documented under [Commands](#commands); `#N` links to the upstream issue or
+PR asking for it.
 
-- **Worklog management**: `jira issue worklog list`, `edit` and `delete` show the ids of an issue's worklogs, change a
-  worklog's time spent, start date or comment, and delete a worklog; `worklog add` prints the id of the new worklog, and
-  `jira worklog list` shows what a user logged on a given day across all issues, with the ids. See
-  [Worklog](#worklog). ([upstream #908](https://github.com/ankitpokhrel/jira-cli/pull/908))
-- **Comment management**: `jira issue comment list`, `edit` and `delete` show the ids of an issue's comments, replace a
-  comment's body, and delete a comment; `comment add` prints the id of the new comment. See [Comment](#comment).
-  ([upstream #975](https://github.com/ankitpokhrel/jira-cli/issues/975))
-- **Attachments**: `jira issue attachment add`, `list` and `download` upload files to an issue, list its attachments, and
-  download them. See [Attachment](#attachment). ([upstream #986](https://github.com/ankitpokhrel/jira-cli/pull/986))
-- **Release creation**: `jira release create --name v1.0` creates a project version, optionally with a description,
-  dates, and released/archived state. See [Releases](#releases).
-  ([upstream #1002](https://github.com/ankitpokhrel/jira-cli/issues/1002))
-- **Sprint issue removal**: `jira sprint remove ISSUE-1 ISSUE-2` moves issues to the backlog, removing them from all
-  active and future sprints. See [Sprint](#sprint).
-- **Sprints from another board**: `jira sprint list --board 42` lists sprints of a board other than the one configured
-  with `jira init`. ([upstream #847](https://github.com/ankitpokhrel/jira-cli/issues/847))
-- **Description-only issue view**: `jira issue view ISSUE-1 --description` prints only the summary and description, without
-  header, comments, or footer. ([upstream #933](https://github.com/ankitpokhrel/jira-cli/issues/933))
-- **Parent in issue view**: `jira issue view` shows the parent issue key in the header.
-  ([upstream #766](https://github.com/ankitpokhrel/jira-cli/issues/766))
-- **Remote link removal**: `jira issue unlink remote ISSUE-1 https://example.com` removes a remote web link from an
-  issue. ([upstream #1006](https://github.com/ankitpokhrel/jira-cli/issues/1006))
-- **Raw project list**: `jira project list --raw` prints the Jira API response, including the project `id`.
-  ([upstream #885](https://github.com/ankitpokhrel/jira-cli/issues/885))
-- **Exact plain columns**: `jira issue list --plain --columns ...` prints only the requested columns instead of always
-  adding `KEY`. ([upstream #747](https://github.com/ankitpokhrel/jira-cli/issues/747))
-- **Readable error on non-JSON responses**: when an SSO redirect, VPN portal, or proxy answers with HTML, the error says
-  so instead of `invalid character '<'`. ([upstream #630](https://github.com/ankitpokhrel/jira-cli/issues/630))
-- **Scoped API tokens**: `jira init --installation cloud --scoped-token` looks up your site's cloud ID and configures
-  the Atlassian API gateway as the server, so tokens created with scopes work. Browser links keep using your site
-  URL. See [Cloud server](#cloud-server). ([upstream #850](https://github.com/ankitpokhrel/jira-cli/issues/850))
-- **Guard against losing inline images**: `jira issue edit` refuses to replace a description that embeds images or
-  attachments, since Jira would delete them, unless `--allow-image-loss` is passed.
-  ([upstream #1005](https://github.com/ankitpokhrel/jira-cli/issues/1005))
-- **Smart links for issue URLs**: on Jira Cloud, bare URLs of issues on your site (`<server>/browse/ABC-1`) in the body
-  of `jira issue create`, `jira issue edit`, `jira issue comment add` and `comment edit` render as smart links showing the
-  issue's summary and status. See [Create](#create).
-- **Mentions and replies**: `@[Name]` in the body of `jira issue create`, `edit`, `comment add` and `comment edit`, and of
-  `jira epic create`, resolves to a real mention, and `jira issue comment add --reply-to ID` mentions and quotes the
-  original comment. See [Mentions](#mentions) and [Comment](#comment).
-  ([upstream #407](https://github.com/ankitpokhrel/jira-cli/issues/407))
-- **Original estimate on edit**: `jira issue edit ISSUE-1 --original-estimate 2h` (`-e`) sets the original estimate of
-  an existing issue, leaving the remaining estimate to Jira. See [Edit](#edit).
-  ([upstream #801](https://github.com/ankitpokhrel/jira-cli/pull/801))
-- **Description from a template on edit**: `jira issue edit ISSUE-1 --template /path/to/file` (`-T`) replaces the
-  description with the contents of a file, or of standard input with `-`, without opening the editor. See [Edit](#edit).
-- **Listing transitions**: `jira issue transitions ISSUE-1` prints the transitions an issue can take, with the status
-  each one leads to, without moving the issue. See [Move/Transition](#movetransition).
-- **Cascading selects in `--custom`**: `--custom platform-component="Parent->Child"` sets a cascading select on
-  `jira issue create`, `jira issue edit` and `jira epic create`; without `->` only the parent is set. See
-  [Create](#create). ([upstream #949](https://github.com/ankitpokhrel/jira-cli/issues/949))
-- **Custom fields by id, and strict `--custom` keys**: `--custom customfield_12345=...` selects a field by its id. A key
-  that isn't in the config is looked up on the server, so fields created after `jira init` work without re-running it.
-  A key that matches no field at all is now an error instead of a warning. See [Create](#create).
-- **Listing the fields of a create screen**: `jira issue fields -t Problem [--required] [--plain]` lists the fields an
-  issue type needs on create, with their ids, types, and allowed values as `--custom` takes them. See
-  [Create](#create).
-- **Verifiable builds**: every release ships SLSA provenance and an SBOM, and every merge to `main` publishes a snapshot
-  Homebrew cask and Docker image. See [Installation](#installation).
+**New commands**
+
+- `jira issue worklog list|edit|delete` and `jira worklog list`: manage worklogs by id, and list what a user logged on
+  a day across all issues. [#908]
+- `jira issue comment list|edit|delete` and `comment add --reply-to ID`: manage comments by id, and reply with a quote.
+  [#975]
+- `jira issue attachment add|list|download`: upload, list, and download attachments. [#986]
+- `jira issue transitions`: list the transitions an issue can take, without moving it.
+- `jira issue fields -t TYPE`: list the fields a create screen needs, with the values `--custom` accepts.
+- `jira issue unlink remote`: remove a remote web link. [#1006]
+- `jira release create`: create a project version. [#1002]
+- `jira sprint remove`: move issues back to the backlog.
+
+**New flags**
+
+- `jira issue edit --original-estimate` [#801] and `--template`.
+- `jira issue view --description`: print only the summary and description. [#933]
+- `jira issue list --plain --columns`: print only the requested columns, without forcing `KEY`. [#747]
+- `jira sprint list --board`: list sprints of another board. [#847]
+- `jira project list --raw`: print the API response, including project ids. [#885]
+- `jira init --scoped-token`: use scoped API tokens on Jira Cloud. [#850]
+- `--custom` takes cascading selects (`Parent->Child`) [#949] and field ids, finds fields added after `jira init`, and
+  rejects unknown keys.
+
+**Behavior**
+
+- `@[Name]` in issue, epic, and comment bodies becomes a real mention, and editing keeps existing mentions. [#407]
+- Issue URLs of your own site render as smart links on Jira Cloud.
+- `jira issue view` shows the parent issue. [#766]
+- `jira issue edit` won't replace a description that embeds images unless `--allow-image-loss` is passed. [#1005]
+- An HTML response from an SSO redirect, VPN portal, or proxy gives a readable error. [#630]
+- Releases ship SLSA provenance and an SBOM; every merge to `main` publishes a snapshot cask and Docker image.
 
 The fork also fixes a number of open upstream bugs; see the [commit history](https://github.com/rethab/jira-cli/commits/main).
+
+[#407]: https://github.com/ankitpokhrel/jira-cli/issues/407
+[#630]: https://github.com/ankitpokhrel/jira-cli/issues/630
+[#747]: https://github.com/ankitpokhrel/jira-cli/issues/747
+[#766]: https://github.com/ankitpokhrel/jira-cli/issues/766
+[#801]: https://github.com/ankitpokhrel/jira-cli/pull/801
+[#847]: https://github.com/ankitpokhrel/jira-cli/issues/847
+[#850]: https://github.com/ankitpokhrel/jira-cli/issues/850
+[#885]: https://github.com/ankitpokhrel/jira-cli/issues/885
+[#908]: https://github.com/ankitpokhrel/jira-cli/pull/908
+[#933]: https://github.com/ankitpokhrel/jira-cli/issues/933
+[#949]: https://github.com/ankitpokhrel/jira-cli/issues/949
+[#975]: https://github.com/ankitpokhrel/jira-cli/issues/975
+[#986]: https://github.com/ankitpokhrel/jira-cli/pull/986
+[#1002]: https://github.com/ankitpokhrel/jira-cli/issues/1002
+[#1005]: https://github.com/ankitpokhrel/jira-cli/issues/1005
+[#1006]: https://github.com/ankitpokhrel/jira-cli/issues/1006
 
 ## Supported platforms
 > [!NOTE]
