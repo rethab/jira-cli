@@ -31,6 +31,9 @@ $ jira issue changelog ISSUE-1 --field status --plain`
 	noAuthor       = "Automation"
 )
 
+// Values like a changed description span several lines, which would break one line per change.
+var flatten = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ", "\t", " ")
+
 // NewCmdChangelog is a changelog command.
 func NewCmdChangelog() *cobra.Command {
 	cmd := cobra.Command{
@@ -107,7 +110,7 @@ func format(histories []jira.ChangelogHistory, plain bool) string {
 
 	for _, h := range histories {
 		for _, it := range h.Items {
-			from, to := value(it.FromString, it.From), value(it.ToString, it.To)
+			from, to := flatten.Replace(value(it.FromString, it.From)), flatten.Replace(value(it.ToString, it.To))
 
 			if plain {
 				lines = append(lines, strings.Join([]string{h.Created, author(h.Author), it.Field, from, to}, "\t"))

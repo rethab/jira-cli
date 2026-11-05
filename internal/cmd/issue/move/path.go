@@ -47,9 +47,11 @@ func (g *graph) addEdge(fromID, fromName, toID, toName string) {
 	g.edges[fromID][toID] = true
 }
 
-// addTransitions adds the edges leaving the issue's current status, which are the only ones
-// known to be allowed for this issue right now.
-func (g *graph) addTransitions(fromID string, transitions []*jira.Transition) {
+// setTransitions replaces the edges leaving the issue's current status with the transitions available to
+// it right now. Other issues may have left that status in ways this one can't, eg. because of a condition,
+// and a path starting with one of those would fail at the first hop.
+func (g *graph) setTransitions(fromID string, transitions []*jira.Transition) {
+	delete(g.edges, fromID)
 	for _, t := range transitions {
 		g.addEdge(fromID, "", t.To.ID, t.To.Name)
 	}

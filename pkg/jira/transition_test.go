@@ -77,6 +77,21 @@ func TestTransitions(t *testing.T) {
 	assertUnexpectedResponse(t, err)
 }
 
+func TestAvailableTransitions(t *testing.T) {
+	all := []*Transition{
+		{Name: "Start work", IsAvailable: true},
+		{Name: "Close", IsAvailable: false},
+	}
+
+	t.Run("cloud hides transitions that are not available", func(t *testing.T) {
+		assert.Equal(t, []*Transition{all[0]}, AvailableTransitions(all, InstallationTypeCloud))
+	})
+
+	t.Run("local keeps all transitions since isAvailable is not returned", func(t *testing.T) {
+		assert.Equal(t, all, AvailableTransitions(all, InstallationTypeLocal))
+	})
+}
+
 func TestTransitionsWithFields(t *testing.T) {
 	var apiVersion2 bool
 

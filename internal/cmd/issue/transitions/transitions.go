@@ -101,28 +101,17 @@ func transitions(cmd *cobra.Command, args []string) {
 	}()
 	cmdutil.ExitIfError(err)
 
-	available := filterAvailable(all, installation)
+	available := jira.AvailableTransitions(all, installation)
 
-	out := format(available, plain)
+	var out string
 	if withFields {
 		out = formatWithFields(available, plain)
+	} else {
+		out = format(available, plain)
 	}
 	if out != "" {
 		fmt.Println(out)
 	}
-}
-
-// Jira API v2 doesn't return "isAvailable", so only Cloud transitions can be filtered,
-// the same way "issue move" treats them.
-func filterAvailable(all []*jira.Transition, installation string) []*jira.Transition {
-	available := make([]*jira.Transition, 0, len(all))
-	for _, t := range all {
-		if installation == jira.InstallationTypeCloud && !t.IsAvailable {
-			continue
-		}
-		available = append(available, t)
-	}
-	return available
 }
 
 func format(transitions []*jira.Transition, plain bool) string {

@@ -95,9 +95,6 @@ type IssueFields struct {
 	Status struct {
 		Name string `json:"name"`
 	} `json:"status"`
-	Project struct {
-		Key string `json:"key"`
-	} `json:"project"`
 	Components []struct {
 		Name string `json:"name"`
 	} `json:"components"`

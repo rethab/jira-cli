@@ -37,9 +37,25 @@ func pv2Graph() *graph {
 	back.To.ID, back.To.Name = readyToTest, "Ready to Test"
 	reject := &jira.Transition{Name: "Reject"}
 	reject.To.ID, reject.To.Name = rejected, "Rejected"
-	g.addTransitions(inTesting, []*jira.Transition{back, reject})
+	g.setTransitions(inTesting, []*jira.Transition{back, reject})
 
 	return g
+}
+
+func TestSetTransitionsReplacesLearntEdges(t *testing.T) {
+	g := newGraph()
+	g.addChangelog([]jira.ChangelogHistory{
+		statusChange(inTesting, "In Testing", toDo, "To Do"),
+		statusChange(readyToTest, "Ready to Test", toDo, "To Do"),
+	})
+
+	g.setTransitions(inTesting, []*jira.Transition{newTransition("Back", readyToTest, "Ready to Test")})
+
+	got, ok := g.shortestPath(inTesting, map[string]bool{toDo: true}, nil)
+
+	assert.True(t, ok)
+	assert.Len(t, got, 2)
+	assert.Equal(t, "Ready to Test", got[0].toName)
 }
 
 func TestShortestPathAvoidsDoneStatuses(t *testing.T) {
@@ -231,13 +247,13 @@ func TestResolveStatuses(t *testing.T) {
 	statuses := []jira.Status{
 		{ID: toDo, Name: "To Do"},
 		{ID: rejected, Name: "Rejected"},
+		{ID: "99", Name: "Rejected"},
 	}
 	statuses[1].StatusCategory.Key = "done"
 
-	cur, targets, done := resolveStatuses(statuses, "to do", "REJECTED")
+	targets, done := resolveStatuses(statuses, "REJECTED")
 
-	assert.Equal(t, toDo, cur)
-	assert.Equal(t, map[string]bool{rejected: true}, targets)
+	assert.Equal(t, map[string]bool{rejected: true, "99": true}, targets)
 	assert.Equal(t, map[string]bool{rejected: true}, done)
 }
 

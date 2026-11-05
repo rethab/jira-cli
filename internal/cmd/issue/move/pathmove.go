@@ -1,6 +1,7 @@
 package move
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -21,6 +22,22 @@ const (
 	doneCategory = "done"
 )
 
+// pathIssue is the part of an issue --path needs. The status is read by id since its name is not unique.
+type pathIssue struct {
+	Fields struct {
+		Project struct {
+			Key string `json:"key"`
+		} `json:"project"`
+		IssueType struct {
+			Name string `json:"name"`
+		} `json:"issuetype"`
+		Status struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"status"`
+	} `json:"fields"`
+}
+
 func (p *moveParams) validatePath() error {
 	switch {
 	case p.yes && !p.path:
@@ -38,16 +55,22 @@ func (p *moveParams) validatePath() error {
 func (mc *moveCmd) movePath(installation string, web bool) error {
 	p := mc.params
 
-	issue, err := withSpinner("Fetching issue...", func() (*jira.Issue, error) {
-		return api.ProxyGetIssue(mc.client, p.key)
+	raw, err := withSpinner("Fetching issue...", func() (string, error) {
+		return api.ProxyGetIssueRaw(mc.client, p.key)
 	})
 	if err != nil {
 		return err
 	}
 
-	project, issueType, currentName := issue.Fields.Project.Key, issue.Fields.IssueType.Name, issue.Fields.Status.Name
-	if project == "" || issueType == "" {
-		return fmt.Errorf("could not read the project and issue type of %s", p.key)
+	var issue pathIssue
+	if err := json.Unmarshal([]byte(raw), &issue); err != nil {
+		return err
+	}
+
+	project, issueType := issue.Fields.Project.Key, issue.Fields.IssueType.Name
+	currentID, currentName := issue.Fields.Status.ID, issue.Fields.Status.Name
+	if project == "" || issueType == "" || currentID == "" {
+		return fmt.Errorf("could not read the project, issue type and status of %s", p.key)
 	}
 
 	statuses, err := withSpinner("Fetching statuses...", mc.client.Statuses)
@@ -55,10 +78,7 @@ func (mc *moveCmd) movePath(installation string, web bool) error {
 		return err
 	}
 
-	currentID, targets, done := resolveStatuses(statuses, currentName, p.state)
-	if currentID == "" {
-		return fmt.Errorf("could not find the current status %q of %s among the statuses of the instance", currentName, p.key)
-	}
+	targets, done := resolveStatuses(statuses, p.state)
 	if len(targets) == 0 {
 		return fmt.Errorf("unknown status %q", p.state)
 	}
@@ -67,9 +87,10 @@ func (mc *moveCmd) movePath(installation string, web bool) error {
 		return nil
 	}
 
+	// With fields, so the dry run picks the same first transition as the walk and can tell what it requires.
 	available, err := withSpinner("Fetching available transitions...", func() ([]*jira.Transition, error) {
-		ts, err := api.ProxyTransitions(mc.client, p.key)
-		return availableTransitions(ts, installation), err
+		ts, err := api.ProxyTransitionsWithFields(mc.client, p.key)
+		return jira.AvailableTransitions(ts, installation), err
 	})
 	if err != nil {
 		return err
@@ -79,7 +100,7 @@ func (mc *moveCmd) movePath(installation string, web bool) error {
 	for _, s := range statuses {
 		g.addName(s.ID, s.Name)
 	}
-	g.addTransitions(currentID, available)
+	g.addName(currentID, currentName)
 
 	sampled, err := withSpinner("Learning the workflow from other issues...", func() (int, error) {
 		return mc.learn(g, project, issueType)
@@ -87,6 +108,7 @@ func (mc *moveCmd) movePath(installation string, web bool) error {
 	if err != nil {
 		return err
 	}
+	g.setTransitions(currentID, available)
 
 	hops, ok := g.shortestPath(currentID, targets, done)
 	if !ok {
@@ -119,8 +141,8 @@ func (mc *moveCmd) movePath(installation string, web bool) error {
 // say about the workflow, and returns how many other issues it looked at.
 func (mc *moveCmd) learn(g *graph, project, issueType string) (int, error) {
 	jql := fmt.Sprintf(
-		`project = "%s" AND issuetype = "%s" AND key != %s ORDER BY updated DESC`,
-		escapeJQL(project), escapeJQL(issueType), mc.params.key,
+		`project = "%s" AND issuetype = "%s" AND key != "%s" ORDER BY updated DESC`,
+		escapeJQL(project), escapeJQL(issueType), escapeJQL(mc.params.key),
 	)
 
 	res, err := api.ProxySearch(mc.client, jql, 0, sampleSize)
@@ -150,14 +172,23 @@ func (mc *moveCmd) learn(g *graph, project, issueType string) (int, error) {
 	}
 	wg.Wait()
 
+	// Other issues only add hints, so one failed fetch (a 429 under load, say) shouldn't
+	// sink the search; the issue's own history is required.
+	if errs[0] != nil {
+		return 0, fmt.Errorf("fetching changelog of %s: %w", keys[0], errs[0])
+	}
+	sampled := 0
 	for i, err := range errs {
 		if err != nil {
-			return 0, fmt.Errorf("fetching changelog of %s: %w", keys[i], err)
+			continue
 		}
 		g.addChangelog(changelogs[i])
+		if i > 0 {
+			sampled++
+		}
 	}
 
-	return len(keys) - 1, nil
+	return sampled, nil
 }
 
 // walk takes the hops one after the other. Each hop looks the transitions up again, since which ones
@@ -166,29 +197,29 @@ func (mc *moveCmd) walk(hops []hop, installation string) error {
 	key := mc.params.key
 
 	for i, h := range hops {
-		step := fmt.Sprintf("hop %d of %d (%q -> %q)", i+1, len(hops), h.fromName, h.toName)
-		applied := ""
-		if i > 0 {
-			applied = fmt.Sprintf("; the %d earlier hop(s) stay applied", i)
+		fail := func(err error) error {
+			applied := ""
+			if i > 0 {
+				applied = fmt.Sprintf("; the %d earlier hop(s) stay applied", i)
+			}
+			return fmt.Errorf("hop %d of %d (%q -> %q): %w; %s is in status %q%s",
+				i+1, len(hops), h.fromName, h.toName, err, key, h.fromName, applied)
 		}
 
 		available, err := withSpinner("Fetching available transitions...", func() ([]*jira.Transition, error) {
 			ts, err := api.ProxyTransitionsWithFields(mc.client, key)
-			return availableTransitions(ts, installation), err
+			return jira.AvailableTransitions(ts, installation), err
 		})
 		if err != nil {
-			return fmt.Errorf("%s: %w; %s is in status %q%s", step, err, key, h.fromName, applied)
+			return fail(err)
 		}
 
 		tr, err := pickTransition(available, h.toID, h.toName)
 		if err != nil {
-			return fmt.Errorf("%s: %w; %s is in status %q%s", step, err, key, h.fromName, applied)
+			return fail(err)
 		}
 		if req := requiredFields(tr); len(req) > 0 {
-			return fmt.Errorf(
-				"%s: transition %q requires fields (%s) that --path cannot provide; %s is in status %q%s",
-				step, tr.Name, strings.Join(req, ", "), key, h.fromName, applied,
-			)
+			return fail(fmt.Errorf("transition %q requires fields (%s) that --path cannot provide", tr.Name, strings.Join(req, ", ")))
 		}
 
 		_, err = withSpinner(fmt.Sprintf("Transitioning issue to %q...", h.toName), func() (struct{}, error) {
@@ -198,7 +229,7 @@ func (mc *moveCmd) walk(hops []hop, installation string) error {
 			return struct{}{}, err
 		})
 		if err != nil {
-			return fmt.Errorf("%s: %w; %s is in status %q%s", step, err, key, h.fromName, applied)
+			return fail(err)
 		}
 
 		cmdutil.Success("Issue %s moved to %q (via %q)", key, h.toName, tr.Name)
@@ -217,7 +248,11 @@ func printPath(hops []hop, available []*jira.Transition, project, issueType stri
 		// Only the transitions out of the current status are known by name.
 		if i == 0 {
 			if tr, err := pickTransition(available, h.toID, h.toName); err == nil {
-				line += fmt.Sprintf("   (via %q)", tr.Name)
+				via := fmt.Sprintf("via %q", tr.Name)
+				if req := requiredFields(tr); len(req) > 0 {
+					via += ", requires " + strings.Join(req, ", ")
+				}
+				line += "   (" + via + ")"
 			}
 		}
 		fmt.Println(line)
@@ -226,17 +261,13 @@ func printPath(hops []hop, available []*jira.Transition, project, issueType stri
 	fmt.Println("Run again with --yes to apply it.")
 }
 
-// resolveStatuses finds the ids of the current and the target status by name, and which statuses are done.
-// The issue only tells us the current status by name, and names can in theory be shared by several statuses.
-func resolveStatuses(statuses []jira.Status, currentName, targetName string) (string, map[string]bool, map[string]bool) {
-	var currentID string
+// resolveStatuses finds the ids of the target status by name, and which statuses are done. Names are shared
+// by several statuses, eg. every team-managed project has its own "To Do", so all of them are targets.
+func resolveStatuses(statuses []jira.Status, targetName string) (map[string]bool, map[string]bool) {
 	targets := map[string]bool{}
 	done := map[string]bool{}
 
 	for _, s := range statuses {
-		if currentID == "" && strings.EqualFold(s.Name, currentName) {
-			currentID = s.ID
-		}
 		if strings.EqualFold(s.Name, targetName) {
 			targets[s.ID] = true
 		}
@@ -245,19 +276,7 @@ func resolveStatuses(statuses []jira.Status, currentName, targetName string) (st
 		}
 	}
 
-	return currentID, targets, done
-}
-
-// Jira API v2 doesn't return "isAvailable", so only Cloud transitions can be filtered.
-func availableTransitions(all []*jira.Transition, installation string) []*jira.Transition {
-	out := make([]*jira.Transition, 0, len(all))
-	for _, t := range all {
-		if installation == jira.InstallationTypeCloud && !t.IsAvailable {
-			continue
-		}
-		out = append(out, t)
-	}
-	return out
+	return targets, done
 }
 
 func escapeJQL(s string) string {

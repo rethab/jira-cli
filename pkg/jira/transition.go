@@ -89,6 +89,19 @@ func (c *Client) TransitionsV2WithFieldsRaw(key string) (string, error) {
 	return string(body), err
 }
 
+// AvailableTransitions drops the transitions Jira reports as unavailable. Jira API v2 doesn't return
+// "isAvailable", so only Cloud transitions can be filtered.
+func AvailableTransitions(all []*Transition, installation string) []*Transition {
+	out := make([]*Transition, 0, len(all))
+	for _, t := range all {
+		if installation == InstallationTypeCloud && !t.IsAvailable {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
 func (c *Client) transitions(key, ver string, withFields bool) ([]*Transition, error) {
 	body, err := c.transitionsBody(key, ver, withFields)
 	if err != nil {

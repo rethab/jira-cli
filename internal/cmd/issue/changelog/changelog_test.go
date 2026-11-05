@@ -75,6 +75,16 @@ func TestFormat(t *testing.T) {
 		assert.Equal(t, want, format(sample(), true))
 	})
 
+	t.Run("multi-line values stay on one line", func(t *testing.T) {
+		histories := []jira.ChangelogHistory{{
+			Created: "x",
+			Items:   []jira.ChangelogItem{{Field: "description", FromString: "a\r\nb", ToString: "c\td\ne"}},
+		}}
+
+		assert.Equal(t, "x  Automation  description  a b -> c d e", format(histories, false))
+		assert.Equal(t, "x\tAutomation\tdescription\ta b\tc d e", format(histories, true))
+	})
+
 	t.Run("no histories", func(t *testing.T) {
 		assert.Empty(t, format(nil, false))
 		assert.Empty(t, format(nil, true))
