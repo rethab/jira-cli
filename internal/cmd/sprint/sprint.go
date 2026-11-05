@@ -6,6 +6,7 @@ import (
 	"github.com/rethab/jira-cli/internal/cmd/sprint/add"
 	"github.com/rethab/jira-cli/internal/cmd/sprint/close"
 	"github.com/rethab/jira-cli/internal/cmd/sprint/list"
+	"github.com/rethab/jira-cli/internal/cmd/sprint/remove"
 )
 
 const helpText = `Sprint manage sprints in a project board. See available commands below.`
@@ -24,8 +25,9 @@ func NewCmdSprint() *cobra.Command {
 	lc := list.NewCmdList()
 	ac := add.NewCmdAdd()
 	cc := close.NewCmdClose()
+	rc := remove.NewCmdRemove()
 
-	cmd.AddCommand(lc, ac, cc)
+	cmd.AddCommand(lc, ac, rc, cc)
 
 	list.SetFlags(lc)
 

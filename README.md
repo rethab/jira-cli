@@ -50,6 +50,8 @@ Features not available upstream:
 - **Release creation**: `jira release create --name v1.0` creates a project version, optionally with a description,
   dates, and released/archived state. See [Releases](#releases).
   ([upstream #1002](https://github.com/ankitpokhrel/jira-cli/issues/1002))
+- **Sprint issue removal**: `jira sprint remove ISSUE-1 ISSUE-2` moves issues to the backlog, removing them from all
+  active and future sprints. See [Sprint](#sprint).
 - **Sprints from another board**: `jira sprint list --board 42` lists sprints of a board other than the one configured
   with `jira init`. ([upstream #847](https://github.com/ankitpokhrel/jira-cli/issues/847))
 - **Description-only issue view**: `jira issue view ISSUE-1 --description` prints only the summary and description, without
@@ -1064,6 +1066,18 @@ $ jira sprint add
 
 # Pass required parameters to skip prompt
 $ jira sprint add SPRINT_ID ISSUE-1 ISSUE-2
+```
+
+#### Remove
+The `remove` command allows you to move issues to the backlog, i.e. remove them from all active and future sprints.
+There is no sprint argument, as Jira's backlog endpoint is not sprint-specific. You can remove up to 50 issues at once.
+
+```sh
+# Remove issues from their sprints using interactive prompt
+$ jira sprint remove
+
+# Pass required parameters to skip prompt
+$ jira sprint remove ISSUE-1 ISSUE-2
 ```
 
 ### Releases
