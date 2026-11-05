@@ -55,6 +55,7 @@ PR asking for it.
 
 **New flags**
 
+- `jira issue edit --type`: change the issue type in place.
 - `jira issue edit --original-estimate` [#801] and `--template`.
 - `jira issue transitions --fields`: list the fields each transition's screen asks for.
 - `jira issue move --path [--yes]`: find and take the transitions to a status several steps away.
@@ -512,6 +513,10 @@ $ jira issue edit ISSUE-1 -b"New description" --allow-image-loss
 
 # Set the original estimate in Jira's duration format; the remaining estimate is left to Jira
 $ jira issue edit ISSUE-1 --original-estimate "1d 4h" --no-input
+
+# Change the issue type; it keeps its status, so Jira refuses if that status isn't in the new type's workflow.
+# Jira's error is shown, and the issue then has to be moved in the Jira web UI
+$ jira issue edit ISSUE-1 --type Bug --no-input
 
 # Load the new description from a template file
 $ jira issue edit ISSUE-1 --template /path/to/template.tmpl

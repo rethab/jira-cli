@@ -1,6 +1,8 @@
 package edit
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -161,6 +163,13 @@ func TestBuildEditRequestMergesIssueFieldsWithParams(t *testing.T) {
 		edr := buildEditRequest(newClient(jira.InstallationTypeLocal), "TEST", issue, &editParams{})
 
 		assert.Equal(t, "TEST-1", edr.ParentIssueKey)
+		assert.Empty(t, edr.IssueType)
+	})
+
+	t.Run("issue type is passed on", func(t *testing.T) {
+		edr := buildEditRequest(newClient(jira.InstallationTypeLocal), "TEST", issue, &editParams{issueType: "Bug"})
+
+		assert.Equal(t, "Bug", edr.IssueType)
 	})
 
 	t.Run("given parent overrides the existing one and is qualified with the project", func(t *testing.T) {
@@ -426,4 +435,27 @@ func TestQuestionsSkipDescriptionEditorWhenTemplateProvidedBody(t *testing.T) {
 	ec := editCmd{params: params}
 
 	assert.Empty(t, ec.questions(&jira.Issue{}, ""))
+}
+
+func TestIssueTypeRejected(t *testing.T) {
+	rejected := &jira.ErrUnexpectedResponse{Body: jira.Errors{Errors: map[string]string{"issuetype": "invalid"}}}
+	other := &jira.ErrUnexpectedResponse{Body: jira.Errors{Errors: map[string]string{"priority": "invalid"}}}
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "issue type error", err: rejected, want: true},
+		{name: "wrapped issue type error", err: fmt.Errorf("x: %w", rejected), want: true},
+		{name: "error on another field", err: other, want: false},
+		{name: "unrelated error", err: errors.New("boom"), want: false},
+		{name: "no error", err: nil, want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, issueTypeRejected(tc.err))
+		})
+	}
 }

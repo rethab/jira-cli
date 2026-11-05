@@ -1,6 +1,7 @@
 package edit
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -29,6 +30,10 @@ $ jira issue edit ISSUE-1 -s"New updated summary" --no-input
 
 # Set the original estimate; the remaining estimate is left to Jira
 $ jira issue edit ISSUE-1 -e"1d 4h" --no-input
+
+# Change the issue type; Jira refuses if the issue's status isn't in the new type's workflow,
+# in which case move the issue in the Jira web UI
+$ jira issue edit ISSUE-1 -t Bug --no-input
 
 # Replacing a description that contains inline images or attachments would delete them,
 # so the command refuses unless you explicitly accept the loss
@@ -139,6 +144,10 @@ func edit(cmd *cobra.Command, args []string) {
 
 		return client.Edit(params.issueKey, edr)
 	}()
+	if params.issueType != "" && issueTypeRejected(err) {
+		cmdutil.Warn("Nothing was updated: Jira refused the issue type. Check that the type exists in the project; " +
+			"if it does and the issue's status isn't in the new type's workflow, move the issue in the Jira web UI instead")
+	}
 	cmdutil.ExitIfError(err)
 
 	cmdutil.Success("Issue updated\n%s", cmdutil.GenerateServerBrowseURL(server, params.issueKey))
@@ -217,6 +226,7 @@ func buildEditRequest(client *jira.Client, project string, issue *jira.Issue, pa
 	}
 
 	edr := &jira.EditRequest{
+		IssueType:        params.issueType,
 		ParentIssueKey:   parent,
 		Summary:          params.summary,
 		Body:             client.ToJiraMD(params.body),
@@ -386,8 +396,16 @@ func (ec *editCmd) questions(issue *jira.Issue, originalBody string) []*survey.Q
 	})
 }
 
+// Jira changes the type in place only if the issue's status exists in the new type's
+// workflow, and its error doesn't mention that moving the issue in the web UI is the way out.
+func issueTypeRejected(err error) bool {
+	var unexpected *jira.ErrUnexpectedResponse
+	return errors.As(err, &unexpected) && unexpected.Body.Errors["issuetype"] != ""
+}
+
 type editParams struct {
 	issueKey         string
+	issueType        string
 	parentIssueKey   string
 	summary          string
 	body             string
@@ -421,6 +439,9 @@ func loadTemplate(params *editParams) error {
 }
 
 func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *editParams {
+	issueType, err := flags.GetString("type")
+	cmdutil.ExitIfError(err)
+
 	parentIssueKey, err := flags.GetString("parent")
 	cmdutil.ExitIfError(err)
 
@@ -476,6 +497,7 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 
 	return &editParams{
 		issueKey:         cmdutil.GetJiraIssueKey(project, args[0]),
+		issueType:        issueType,
 		parentIssueKey:   parentIssueKey,
 		summary:          summary,
 		body:             body,
@@ -570,6 +592,7 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().SortFlags = false
 
+	cmd.Flags().StringP("type", "t", "", "Change issue type (the issue's status must exist in the new type's workflow)")
 	cmd.Flags().StringP("parent", "P", "", `Link to a parent key`)
 	cmd.Flags().StringP("summary", "s", "", "Edit summary or title")
 	cmd.Flags().StringP("body", "b", "", "Edit description")
