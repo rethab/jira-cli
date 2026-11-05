@@ -95,6 +95,9 @@ type IssueFields struct {
 	Status struct {
 		Name string `json:"name"`
 	} `json:"status"`
+	Project struct {
+		Key string `json:"key"`
+	} `json:"project"`
 	Components []struct {
 		Name string `json:"name"`
 	} `json:"components"`
@@ -186,10 +189,39 @@ type Transition struct {
 	ID          json.Number `json:"id"`
 	Name        string      `json:"name"`
 	IsAvailable bool        `json:"isAvailable"`
+	// HasScreen is true when Jira asks for fields while taking the transition.
+	HasScreen bool `json:"hasScreen"`
+	// Fields is only filled when the transitions were fetched with their fields expanded.
+	Fields map[string]TransitionField `json:"fields,omitempty"`
 	// To is the status the issue ends up in. Transition names often differ from it.
 	To struct {
-		Name string `json:"name"`
+		ID             string `json:"id"`
+		Name           string `json:"name"`
+		StatusCategory struct {
+			Key string `json:"key"`
+		} `json:"statusCategory"`
 	} `json:"to"`
+}
+
+// TransitionField is a field on the screen of a transition.
+type TransitionField struct {
+	Required        bool   `json:"required"`
+	Name            string `json:"name"`
+	HasDefaultValue bool   `json:"hasDefaultValue"`
+	Schema          struct {
+		Type   string `json:"type"`
+		System string `json:"system"`
+		Custom string `json:"custom"`
+	} `json:"schema"`
+	AllowedValues []TransitionFieldValue `json:"allowedValues,omitempty"`
+}
+
+// TransitionFieldValue is an allowed value of a transition field. System fields like
+// resolution use "name", custom option fields use "value".
+type TransitionFieldValue struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 // User holds user info.

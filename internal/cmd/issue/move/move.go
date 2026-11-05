@@ -16,9 +16,20 @@ import (
 )
 
 const (
-	helpText = `Move transitions an issue from one state to another.`
+	helpText = `Move transitions an issue from one state to another.
+
+With --path, the second argument is the status to end up in instead of a transition name, and the
+statuses in between are worked out from the status changes of other issues of the same project and type.
+Without --yes it only prints the path. The path never goes through a done status unless that is the target,
+as transitions into those usually set a resolution.`
 	examples = `$ jira issue move ISSUE-1 "In Progress"
-$ jira issue move ISSUE-1 Done`
+$ jira issue move ISSUE-1 Done
+
+# Print the steps needed to get to a status that is several transitions away
+$ jira issue move ISSUE-1 "To Do" --path
+
+# Take those steps
+$ jira issue move ISSUE-1 "To Do" --path --yes`
 
 	optionCancel = "Cancel"
 )
@@ -44,6 +55,8 @@ STATE		State you want to transition the issue to`,
 	cmd.Flags().StringP("assignee", "a", "", "Assign issue to a user")
 	cmd.Flags().StringP("resolution", "R", "", "Set resolution")
 	cmd.Flags().Bool("web", false, "Open issue in web browser after successful transition")
+	cmd.Flags().Bool("path", false, "Treat STATE as the target status and move through all statuses needed to reach it")
+	cmd.Flags().Bool("yes", false, "With --path, apply the path instead of only printing it")
 
 	return &cmd
 }
@@ -57,6 +70,16 @@ func move(cmd *cobra.Command, args []string) {
 		client:      client,
 		transitions: nil,
 		params:      params,
+	}
+
+	cmdutil.ExitIfError(params.validatePath())
+
+	if params.path {
+		web, err := cmd.Flags().GetBool("web")
+		cmdutil.ExitIfError(err)
+
+		cmdutil.ExitIfError(mc.movePath(installation, web))
+		return
 	}
 
 	cmdutil.ExitIfError(mc.setIssueKey(project))
@@ -133,6 +156,8 @@ type moveParams struct {
 	comment    string
 	assignee   string
 	resolution string
+	path       bool
+	yes        bool
 	debug      bool
 }
 
@@ -156,6 +181,12 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *m
 	resolution, err := flags.GetString("resolution")
 	cmdutil.ExitIfError(err)
 
+	path, err := flags.GetBool("path")
+	cmdutil.ExitIfError(err)
+
+	yes, err := flags.GetBool("yes")
+	cmdutil.ExitIfError(err)
+
 	debug := viper.GetBool("debug")
 
 	return &moveParams{
@@ -164,6 +195,8 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *m
 		comment:    comment,
 		assignee:   assignee,
 		resolution: resolution,
+		path:       path,
+		yes:        yes,
 		debug:      debug,
 	}
 }

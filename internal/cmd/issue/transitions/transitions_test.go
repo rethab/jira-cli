@@ -47,3 +47,46 @@ func TestFormat(t *testing.T) {
 	assert.Equal(t, "Reopen", format(noTarget, false))
 	assert.Equal(t, "Reopen\t", format(noTarget, true))
 }
+
+func TestFormatWithFields(t *testing.T) {
+	start := newTransition("Start work", "In Progress", true)
+
+	rejected := newTransition("Rejected", "Rejected", true)
+	rejected.HasScreen = true
+	rejected.Fields = map[string]jira.TransitionField{
+		"worklog": {Name: "Log Work"},
+		"resolution": {
+			Name:     "Resolution",
+			Required: true,
+			AllowedValues: []jira.TransitionFieldValue{
+				{ID: "1", Name: "Done"}, {ID: "2", Name: "Won't Do"}, {ID: "3", Value: "Duplicate"},
+			},
+		},
+	}
+
+	all := []*jira.Transition{start, rejected}
+
+	t.Run("pretty", func(t *testing.T) {
+		want := "Start work -> In Progress\n" +
+			"Rejected -> Rejected (screen)\n" +
+			"    resolution  Resolution  required  Done, Won't Do, Duplicate\n" +
+			"    worklog     Log Work    optional"
+
+		assert.Equal(t, want, formatWithFields(all, false))
+	})
+
+	t.Run("plain has a line per field and one for transitions without fields", func(t *testing.T) {
+		want := "Start work\tIn Progress\t\t\t\t\n" +
+			"Rejected\tRejected\tresolution\tResolution\trequired\tDone,Won't Do,Duplicate\n" +
+			"Rejected\tRejected\tworklog\tLog Work\toptional\t"
+
+		assert.Equal(t, want, formatWithFields(all, true))
+	})
+
+	t.Run("pretty without target status", func(t *testing.T) {
+		assert.Equal(t, "Reopen", formatWithFields([]*jira.Transition{newTransition("Reopen", "", true)}, false))
+	})
+
+	assert.Empty(t, formatWithFields(nil, false))
+	assert.Empty(t, formatWithFields(nil, true))
+}

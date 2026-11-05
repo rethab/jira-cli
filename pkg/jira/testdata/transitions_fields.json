@@ -1,0 +1,48 @@
+{
+  "expand": "transitions",
+  "transitions": [
+    {
+      "id": "21",
+      "name": "Start work",
+      "isAvailable": true,
+      "hasScreen": false,
+      "to": {
+        "id": "10001",
+        "name": "In Progress",
+        "statusCategory": {"key": "indeterminate"}
+      }
+    },
+    {
+      "id": "41",
+      "name": "Rejected",
+      "isAvailable": true,
+      "hasScreen": true,
+      "to": {
+        "id": "10003",
+        "name": "Rejected",
+        "statusCategory": {"key": "done"}
+      },
+      "fields": {
+        "resolution": {
+          "required": true,
+          "name": "Resolution",
+          "hasDefaultValue": false,
+          "schema": {"type": "resolution", "system": "resolution"},
+          "allowedValues": [
+            {"id": "1", "name": "Done"},
+            {"id": "2", "name": "Won't Do"}
+          ]
+        },
+        "customfield_10010": {
+          "required": false,
+          "name": "Reason",
+          "hasDefaultValue": false,
+          "schema": {"type": "option", "custom": "com.atlassian.jira.plugin.system.customfieldtypes:select"},
+          "allowedValues": [
+            {"id": "5", "value": "Duplicate"}
+          ]
+        }
+      }
+    }
+  ]
+}
