@@ -223,6 +223,37 @@ func (c *Client) SprintIssuesAdd(id string, issues ...string) error {
 	return nil
 }
 
+// SprintIssuesRemove moves issues to the backlog, removing them from all active and future sprints.
+func (c *Client) SprintIssuesRemove(issues ...string) error {
+	path := "/backlog/issue"
+
+	data := struct {
+		Issues []string `json:"issues"`
+	}{Issues: issues}
+
+	body, err := json.Marshal(&data)
+	if err != nil {
+		return err
+	}
+
+	res, err := c.PostV1(context.Background(), path, body, Header{
+		"Accept":       "application/json",
+		"Content-Type": "application/json",
+	})
+	if err != nil {
+		return err
+	}
+	if res == nil {
+		return ErrEmptyResponse
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	if res.StatusCode != http.StatusNoContent {
+		return formatUnexpectedResponse(res)
+	}
+	return nil
+}
+
 // LastNSprints fetches sprint in descending order.
 //
 // Jira api to get all sprints doesn't provide an option to sort results and
