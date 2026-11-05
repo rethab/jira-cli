@@ -250,6 +250,32 @@ func ProxyTransitionsRaw(c *jira.Client, key string) (string, error) {
 	return c.TransitionsRaw(key)
 }
 
+// ProxyTransitionsWithFields is ProxyTransitions with the fields of each transition's screen expanded.
+func ProxyTransitionsWithFields(c *jira.Client, key string) ([]*jira.Transition, error) {
+	if viper.GetString("installation") == jira.InstallationTypeLocal {
+		return c.TransitionsV2WithFields(key)
+	}
+	return c.TransitionsWithFields(key)
+}
+
+// ProxyTransitionsWithFieldsRaw is ProxyTransitionsRaw with the fields of each transition's screen expanded.
+func ProxyTransitionsWithFieldsRaw(c *jira.Client, key string) (string, error) {
+	if viper.GetString("installation") == jira.InstallationTypeLocal {
+		return c.TransitionsV2WithFieldsRaw(key)
+	}
+	return c.TransitionsWithFieldsRaw(key)
+}
+
+// ProxyChangelog uses either the v3 changelog endpoint or the v2 expanded issue to fetch
+// all changelog histories of an issue, oldest first, based on configured installation type.
+// Defaults to v3 if installation type is not defined in the config.
+func ProxyChangelog(c *jira.Client, key string) ([]jira.ChangelogHistory, error) {
+	if viper.GetString("installation") == jira.InstallationTypeLocal {
+		return c.ChangelogV2(key)
+	}
+	return c.Changelog(key)
+}
+
 // ProxyWatchIssue uses either a v2 or v3 version of the PUT /issue/{key}/watchers
 // endpoint to assign an issue to the user. Defaults to v3 if installation type is
 // not defined in the config.

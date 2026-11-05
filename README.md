@@ -47,6 +47,7 @@ PR asking for it.
   [#975]
 - `jira issue attachment add|list|download`: upload, list, and download attachments. [#986]
 - `jira issue transitions`: list the transitions an issue can take, without moving it.
+- `jira issue changelog`: print an issue's change history, optionally for one field.
 - `jira issue fields -t TYPE`: list the fields a create screen needs, with the values `--custom` accepts.
 - `jira issue unlink remote`: remove a remote web link. [#1006]
 - `jira release create`: create a project version. [#1002]
@@ -55,6 +56,8 @@ PR asking for it.
 **New flags**
 
 - `jira issue edit --original-estimate` [#801] and `--template`.
+- `jira issue transitions --fields`: list the fields each transition's screen asks for.
+- `jira issue move --path [--yes]`: find and take the transitions to a status several steps away.
 - `jira issue view --description`: print only the summary and description. [#933]
 - `jira issue list --plain --columns`: print only the requested columns, without forcing `KEY`. [#747]
 - `jira sprint list --board`: list sprints of another board. [#847]
@@ -596,6 +599,51 @@ $ jira issue transitions ISSUE-1 --plain
 $ jira issue transitions ISSUE-1 --raw
 ```
 
+Transitions that open a screen can ask for fields, and some are required: "Rejected" typically asks for a resolution, so
+the issue ends up resolved. Use `--fields` to see which transitions have a screen and what it asks for. Fields are sorted
+by id, and the allowed values are the ones `--resolution` and friends take.
+
+```sh
+$ jira issue transitions ISSUE-1 --fields
+Start work -> In Progress
+Rejected -> Rejected (screen)
+    resolution  Resolution  required  Done, Won't Do, Duplicate
+    worklog     Log Work    optional
+
+# Tab separated "transition", "status", "field id", "field name", "required|optional" and "allowed values",
+# with one line per field
+$ jira issue transitions ISSUE-1 --fields --plain
+
+# The raw response, which now includes the fields
+$ jira issue transitions ISSUE-1 --fields --raw
+```
+
+##### Moving through several statuses
+
+`transitions` only shows one step. When the status you want is several transitions away, use `--path` with the
+status you want to end up in, instead of a transition name. Without `--yes` the command only prints the path.
+
+```sh
+$ jira issue move ISSUE-1 "To Do" --path
+Path from "In Testing" to "To Do" (learnt from the history of 50 PV2 Bug issues):
+  1. In Testing -> Ready to Test   (via "Back to Ready to Test")
+  2. Ready to Test -> Code Review
+  3. Code Review -> In Progress
+  4. In Progress -> To Do
+Run again with --yes to apply it.
+
+# Take the steps, one transition at a time
+$ jira issue move ISSUE-1 "To Do" --path --yes
+```
+
+Reading the workflow definition needs Jira admin rights, so the path is learnt from data every user can read: the
+transitions available to the issue right now, and the status changes in the history of the issue and of up to 50 recent
+issues of the same project and issue type. It is the shortest path found there, and it never goes through a status in the
+done category unless that is the target, since transitions like "Rejected" are available from everywhere and set a
+resolution. If a step has no matching transition or asks for required fields, the command stops and tells you which
+status the issue is in; the steps already taken stay applied. `--path` cannot be combined with `--comment`,
+`--assignee` or `--resolution`.
+
 #### View
 The `view` command lets you see issue details in a terminal. Atlassian document is roughly converted to Markdown
 and is nicely displayed in the terminal.
@@ -617,6 +665,22 @@ $ jira issue view ISSUE-1 --comments 5
 
 # Print only the summary and description, e.g. to feed into another tool
 $ jira issue view ISSUE-1 --description
+```
+
+#### Changelog
+The `changelog` command (alias `history`) prints the change history of an issue, one line per changed field, oldest
+first: when it happened, who did it, the field, and the old and new value. Times are shown in your local time zone.
+
+```sh
+$ jira issue changelog ISSUE-1
+2026-10-01 14:03  Jane Doe    status    To Do -> In Progress
+2026-10-02 09:41  Jane Doe    assignee  - -> John Roe
+
+# Only the status changes; the field is matched by name or id, ignoring case
+$ jira issue changelog ISSUE-1 --field status
+
+# Tab separated "created", "author", "field", "from" and "to", for scripts
+$ jira issue changelog ISSUE-1 --field status --plain
 ```
 
 #### Link
