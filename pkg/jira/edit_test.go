@@ -96,6 +96,47 @@ func TestEditOriginalEstimate(t *testing.T) {
 	assert.NotContains(t, gotBody, "timetracking")
 }
 
+func TestEditIssueType(t *testing.T) {
+	var gotBody string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/rest/api/2/issue/TEST-1", r.URL.Path)
+		assert.Equal(t, "PUT", r.Method)
+
+		body, err := io.ReadAll(r.Body)
+		assert.NoError(t, err)
+		gotBody = string(body)
+
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+	err := client.Edit("TEST-1", &EditRequest{IssueType: "Bug"})
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"update":{},"fields":{"parent":{},"issuetype":{"name":"Bug"}}}`, gotBody)
+
+	err = client.Edit("TEST-1", &EditRequest{Summary: "x"})
+	assert.NoError(t, err)
+	assert.NotContains(t, gotBody, "issuetype")
+}
+
+func TestEditIssueTypeRejected(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"errorMessages":[],"errors":{"issuetype":"The issue type selected is invalid."}}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+	err := client.Edit("TEST-1", &EditRequest{IssueType: "Bug"})
+	assertUnexpectedResponse(t, err)
+	assert.Contains(t, err.Error(), "The issue type selected is invalid.")
+}
+
 func TestEdit(t *testing.T) {
 	var gotRawQuery string
 

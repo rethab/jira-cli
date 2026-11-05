@@ -172,7 +172,12 @@ type editRequest struct {
 			Key string `json:"key,omitempty"`
 			Set string `json:"set,omitempty"`
 		} `json:"parent,omitempty"`
+		IssueType *editIssueType `json:"issuetype,omitempty"`
 	} `json:"fields"`
+}
+
+type editIssueType struct {
+	Name string `json:"name"`
 }
 
 func getRequestDataForEdit(req *EditRequest) *editRequest {
@@ -353,6 +358,7 @@ func getRequestDataForEdit(req *EditRequest) *editRequest {
 			Key string `json:"key,omitempty"`
 			Set string `json:"set,omitempty"`
 		} `json:"parent,omitempty"`
+		IssueType *editIssueType `json:"issuetype,omitempty"`
 	}{
 		Parent: &struct {
 			Key string `json:"key,omitempty"`
@@ -365,6 +371,9 @@ func getRequestDataForEdit(req *EditRequest) *editRequest {
 		} else {
 			fields.Parent.Key = req.ParentIssueKey
 		}
+	}
+	if req.IssueType != "" {
+		fields.IssueType = &editIssueType{Name: req.IssueType}
 	}
 
 	data := editRequest{
