@@ -1,11 +1,13 @@
 # Prompt template: investigator (Opus)
 
-Fill in `{{CLAIM}}` and `{{CONTEXT}}`, then pass everything below the line as the agent prompt.
+Fill in `{{CLAIM}}`, `{{CONTEXT}}` and `{{LEAK_CHECK}}` (absolute path of `scripts/leak-check.sh`), then pass
+everything below the line as the agent prompt.
 
 ---
 
 You are judging whether a proposed feature should be added to `jira-cli`, a Go CLI for Jira. The repository is in the
-current directory. It is a fork of `ankitpokhrel/jira-cli` (read `CLAUDE.md` first). Ignore `GAPS.md`.
+current directory. It is a fork of `ankitpokhrel/jira-cli` (read `CLAUDE.md` first). Ignore `GAPS.md` and any other
+file the user wrote the claim in. Everything you need from it is quoted below.
 
 The user says:
 
@@ -29,7 +31,8 @@ Find out how the endpoint actually behaves. Don't rely on memory.
   feature exists on both, and where it differs (ADF vs. wiki markup, accountId vs. username, endpoint availability).
   A Cloud-only feature can still be fine if the CLI already has a pattern for that, but say so explicitly.
 - If a Jira instance is configured for this CLI and reachable, you may make read-only GET requests to confirm response
-  shapes. Never create, edit, or delete anything on a real instance.
+  shapes. Never create, edit, or delete anything on a real instance. It's the user's private work instance: what you
+  see there informs your judgment but never goes into the plan (see "Keep it generic" below).
 
 ## 2. Is it really missing from the CLI?
 
@@ -85,3 +88,13 @@ The plan is all the implementer gets. It is a capable engineer who hasn't seen t
 - **Docs**: the "Additional features" bullet for `README.md` (group, wording, upstream `[#N]` link if any), and
   which "Commands" section gets the usage docs.
 - **Out of scope**: things deliberately left out, so the implementer doesn't add them.
+
+### Keep it generic
+
+The implementer copies examples and fixtures straight from the plan into a public repo, so the plan must contain no
+detail of the user's own Jira or accounts. That means no server host or site name, login or mail domain, project or
+issue keys, board or team names, account IDs, instance-specific custom field IDs, real issue text, and no GitHub
+account other than `rethab`. The same goes for the claim quoted above: write its example in generic terms. Describe
+a response shape you saw as a made-up fixture: `example.atlassian.net`, `TEST-1`, IDs from the Atlassian docs or
+obviously fake ones. Say "a real Cloud description contained X", never which issue. Before you finish, run
+`{{LEAK_CHECK}} text <plan file>` and fix every hit.
