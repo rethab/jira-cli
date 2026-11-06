@@ -13,9 +13,34 @@ didn't write. Don't collapse stages into one agent, and don't do an agent's job 
 Repository facts every stage relies on (all from `CLAUDE.md`, which each agent should read too):
 
 - Fork of `ankitpokhrel/jira-cli`. PRs go to `rethab/jira-cli`, always with `--repo rethab/jira-cli --base main`.
-- `gh` errors or 404s usually mean the wrong account: `gh auth switch --user rethab`.
-- Ignore `GAPS.md` in the repo root. It's the user's private scratch file: don't read it, act on it, stage it, or
-  commit it.
+- `gh` errors or 404s usually mean the wrong account: `gh auth switch --user rethab`. The machine is also logged in
+  to a work account, so never act on GitHub as anyone but `rethab`.
+
+## Private input and instance details
+
+The user works against a real, non-public Jira instance and has more than one GitHub account. None of that may
+reach anything this pipeline publishes: code, tests, fixtures, README, commit messages, branch names, the PR title,
+body and comments, GitHub issues or comments (fork or upstream), the merge commit, or the release.
+
+- **Instance details** include: the Jira server host and site name, the login and its mail domain, project keys and
+  real issue keys, board and team names, account IDs, custom field IDs or names specific to that instance, and any
+  real issue content (summaries, descriptions, comments). Also any GitHub account other than `rethab`. Examples and
+  fixtures use the placeholders the repo already uses: `example.atlassian.net`, `TEST-1`/`ABC-1`, made-up IDs.
+- **Private input.** If the user hands in a file (`@GAPS.md`, a notes file, any Markdown), it's private. Read it
+  yourself and give the investigator the claim in the prompt. Don't point agents at the file. It must never be staged,
+  committed, or copied into the repo under another name. Agents stage explicit paths only, never `git add -A` or
+  `git add .`. Delete it only if the user asks. `GAPS.md` in the repo root is the user's usual scratch file: when it
+  isn't the input, ignore it.
+- **The gate** is `scripts/leak-check.sh` (in this skill's directory; use its absolute path in agent prompts). It
+  reads the private terms from the local Jira and `gh` config at run time, so they never have to be written down
+  anywhere, and fails on any match:
+  - `leak-check.sh branch [--forbid <input>]` before every push,
+  - `leak-check.sh text <draft> [--forbid <input>]` before posting a PR body, comment or issue,
+  - `leak-check.sh pr <N> [--forbid <input>]` on the PR as a whole.
+
+  Pass `--forbid <absolute path of the input file>` whenever there is one. A hit means the content is fixed before it
+  goes out. If a hit is already on GitHub (a pushed commit, a posted body or comment), stop and tell the user what
+  leaked and where. Removing it means rewriting a pushed branch or editing history, and that's the user's call.
 
 Templates for the three agent prompts are in `references/`. Read the matching one right before spawning each agent,
 fill in the placeholders, and pass the result as the prompt. They carry the detailed instructions, so the agent
@@ -24,8 +49,9 @@ doesn't need this file.
 ## Stage 1: Investigate (Opus)
 
 Spawn a `general-purpose` agent with `model: "opus"` and the prompt from `references/investigate.md`. Give it the
-user's claim verbatim, plus any endpoint, docs link, or example they gave. No worktree is needed because it only
-reads.
+user's claim verbatim, plus any endpoint, docs link, or example they gave. If the claim came from a file, paste its
+relevant text into the prompt, along with the absolute path of `leak-check.sh`. No worktree is needed because it
+only reads.
 
 It ends with `VERDICT: REJECT` or `VERDICT: ACCEPT` and the absolute path of a plan file.
 
@@ -33,27 +59,32 @@ It ends with `VERDICT: REJECT` or `VERDICT: ACCEPT` and the absolute path of a p
   the design) and stop. A rejection is a successful outcome. Don't argue with it or re-spawn hoping for a different
   answer. If the user disagrees and adds new information, run Stage 1 again with that information.
 - **ACCEPT**: read the plan file yourself, check that it names the API endpoints, the files to touch, the tests to
-  write first, and the README bullet, then give the user a 3–5 line summary of what will be built and continue.
+  write first, and the README bullet. Run `leak-check.sh text <plan>`, since the implementer copies from the plan.
+  On a hit, have the investigator rewrite those parts in generic terms. Then give the user a 3–5 line summary of what
+  will be built and continue.
 
 ## Stage 2: Implement test-first and open the PR (Sonnet)
 
 Spawn a `general-purpose` agent with `model: "sonnet"`, `isolation: "worktree"`, and the prompt from
-`references/implement.md`, passing the plan file's absolute path. The worktree keeps the user's checkout (and
-`GAPS.md`) untouched.
+`references/implement.md`, passing the plan file's absolute path, the absolute path of `leak-check.sh`, and the input
+file's absolute path (or "none"). The worktree keeps the user's checkout (and any input file in it) untouched.
 
 It returns a PR number and branch name once the PR's checks are green. If it reports that checks are still red after
 its fix attempts, or that the plan doesn't work, stop and tell the user what it found. Don't push past a red PR.
 
-Check it yourself before moving on: `gh pr checks <N> --repo rethab/jira-cli` must show every check passing.
+Check it yourself before moving on:
+- `gh pr checks <N> --repo rethab/jira-cli` must show every check passing.
+- `leak-check.sh pr <N> --forbid <input>` must be clean.
 
 ## Stage 3: Code review with fixes (Opus)
 
 Spawn a `general-purpose` agent with `model: "opus"`, `isolation: "worktree"`, and the prompt from
-`references/review.md`, passing the PR number and branch. It checks out the PR branch, runs `/code-review --fix`,
-pushes the fixes, and waits for green again.
+`references/review.md`, passing the PR number, the branch, the absolute path of `leak-check.sh`, and the input file's
+absolute path (or "none"). It checks out the PR branch, runs `/code-review --fix`, pushes the fixes, and waits for
+green again.
 
 When it returns, check again: the PR head must be the commit it reports pushing (or unchanged if there was nothing to
-fix), and every check on it must pass.
+fix), every check on it must pass, and `leak-check.sh pr <N> --forbid <input>` must be clean.
 
 ## Stage 4: Squash merge
 
@@ -68,6 +99,9 @@ gh pr merge <N> --repo rethab/jira-cli --squash --delete-branch \
 Passing title and body explicitly keeps the history format of earlier merges (subject `Title (#N)`, body = PR
 description). Write the body to a file and use `--body-file` if it contains backticks or quotes. If the PR isn't
 mergeable (conflict with a newer `main`), stop and tell the user. Don't rebase it yourself.
+
+The merge commit lands on `main` for good and its subject goes into the release notes. So run
+`leak-check.sh pr <N> --forbid <input>` once more right before merging, in case the PR changed since Stage 3.
 
 ## Stage 5: Release
 
