@@ -88,6 +88,35 @@ func TestShouldReadBodyFromStdin(t *testing.T) {
 	}
 }
 
+func TestOnlyAppending(t *testing.T) {
+	tests := []struct {
+		name   string
+		params *editParams
+		want   bool
+	}{
+		{name: "append alone", params: &editParams{appendBody: "a"}, want: true},
+		{name: "append and assignee", params: &editParams{appendBody: "a", assignee: "me"}, want: true},
+		{name: "append and notify flag", params: &editParams{appendBody: "a", skipNotify: true}, want: true},
+		{name: "no append", params: &editParams{}, want: false},
+		{name: "summary", params: &editParams{appendBody: "a", summary: "s"}, want: false},
+		{name: "issue type", params: &editParams{appendBody: "a", issueType: "Bug"}, want: false},
+		{name: "parent", params: &editParams{appendBody: "a", parentIssueKey: "P-1"}, want: false},
+		{name: "priority", params: &editParams{appendBody: "a", priority: "High"}, want: false},
+		{name: "original estimate", params: &editParams{appendBody: "a", originalEstimate: "1d"}, want: false},
+		{name: "labels", params: &editParams{appendBody: "a", labels: []string{"l"}}, want: false},
+		{name: "components", params: &editParams{appendBody: "a", components: []string{"c"}}, want: false},
+		{name: "fix versions", params: &editParams{appendBody: "a", fixVersions: []string{"v"}}, want: false},
+		{name: "affects versions", params: &editParams{appendBody: "a", affectsVersions: []string{"v"}}, want: false},
+		{name: "custom fields", params: &editParams{appendBody: "a", customFields: map[string]string{"k": "v"}}, want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, onlyAppending(tc.params))
+		})
+	}
+}
+
 func TestAppendWiki(t *testing.T) {
 	tests := []struct {
 		name     string

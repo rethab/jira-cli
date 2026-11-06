@@ -143,20 +143,23 @@ func edit(cmd *cobra.Command, args []string) {
 		params.appendBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.appendBody, params.noInput)
 	}
 
-	edr := buildEditRequest(client, project, issue, params)
-	edr.WithCustomFields(customFields)
+	appendOnly := onlyAppending(params)
+	if !appendOnly {
+		edr := buildEditRequest(client, project, issue, params)
+		edr.WithCustomFields(customFields)
 
-	err = func() error {
-		s := cmdutil.Info("Updating an issue...")
-		defer s.Stop()
+		err = func() error {
+			s := cmdutil.Info("Updating an issue...")
+			defer s.Stop()
 
-		return client.Edit(params.issueKey, edr)
-	}()
-	if params.issueType != "" && issueTypeRejected(err) {
-		cmdutil.Warn("Nothing was updated: Jira refused the issue type. Check that the type exists in the project; " +
-			"if it does and the issue's status isn't in the new type's workflow, move the issue in the Jira web UI instead")
+			return client.Edit(params.issueKey, edr)
+		}()
+		if params.issueType != "" && issueTypeRejected(err) {
+			cmdutil.Warn("Nothing was updated: Jira refused the issue type. Check that the type exists in the project; " +
+				"if it does and the issue's status isn't in the new type's workflow, move the issue in the Jira web UI instead")
+		}
+		cmdutil.ExitIfError(err)
 	}
-	cmdutil.ExitIfError(err)
 
 	if params.appendBody != "" {
 		local := viper.GetString("installation") == jira.InstallationTypeLocal
@@ -166,6 +169,9 @@ func edit(cmd *cobra.Command, args []string) {
 
 			return appendDescription(client, params.issueKey, params.appendBody, local, params.skipNotify)
 		}()
+		if err != nil && appendOnly {
+			cmdutil.Failed("Appending to the description failed: %s", err)
+		}
 		if err != nil {
 			cmdutil.Failed("Other changes were saved, but appending to the description failed: %s", err)
 		}

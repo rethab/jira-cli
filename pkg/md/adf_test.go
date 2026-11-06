@@ -162,6 +162,33 @@ func TestToADF(t *testing.T) {
 				`,{"type":"mention","attrs":{"id":"abc123"}},` + text("!", mark("em")))),
 		},
 		{
+			name: "mention in code stays as written",
+			in:   "`[~accountid:abc123]`\n\n```\n[~accountid:abc123]\n```",
+			want: doc(para(text("[~accountid:abc123]", mark("code"))) + "," +
+				`{"type":"codeBlock","content":[` + text("[~accountid:abc123]") + `]}`),
+		},
+		{
+			name: "mention in a url stays as written",
+			in:   "[t](https://x/[~accountid:abc123])",
+			want: doc(para(text("t", link("https://x/[~accountid:abc123]")))),
+		},
+		{
+			name: "image inside a link keeps a single link mark",
+			in:   "[![alt](https://x/i.png)](https://y)",
+			want: doc(para(text("alt", link("https://y")))),
+		},
+		{
+			name: "blockquote holds only content ADF allows there",
+			in:   "> # h\n>\n> > nested",
+			want: doc(`{"type":"blockquote","content":[` + para(text("h")) + "," + para(text("nested")) + `]}`),
+		},
+		{
+			name: "list item holds only content ADF allows there",
+			in:   "* a\n\n    # h\n\n    > q\n\n    ---",
+			want: doc(`{"type":"bulletList","content":[{"type":"listItem","content":[` +
+				para(text("a")) + "," + para(text("h")) + "," + para(text("q")) + `]}]}`),
+		},
+		{
 			name: "other bracketed tildes stay text",
 			in:   "[~name]",
 			want: doc(para(text("[~name]"))),

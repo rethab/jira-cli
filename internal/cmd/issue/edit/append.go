@@ -32,6 +32,18 @@ func shouldReadBodyFromStdin(params *editParams, stdinHasData bool) bool {
 	return params.body == "" && params.template == "" && params.appendBody == "" && stdinHasData
 }
 
+// The append is a request of its own, so an edit request with nothing else in it
+// would be a second, empty update that Jira can still announce to watchers.
+// The assignee is set by a separate request and doesn't count.
+func onlyAppending(params *editParams) bool {
+	return params.appendBody != "" &&
+		params.summary == "" && params.body == "" && params.issueType == "" &&
+		params.parentIssueKey == "" && params.priority == "" && params.originalEstimate == "" &&
+		len(params.labels) == 0 && len(params.components) == 0 &&
+		len(params.fixVersions) == 0 && len(params.affectsVersions) == 0 &&
+		len(params.customFields) == 0
+}
+
 // Cloud keeps the description as ADF and Server as wiki markup, so each is
 // extended in its own format; converting the existing content would change it.
 func appendDescription(client *jira.Client, key, markdown string, local, skipNotify bool) error {

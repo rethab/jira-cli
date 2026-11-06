@@ -543,7 +543,8 @@ $ jira issue edit ISSUE-1 --label -p2 --label p1 --component -FE --component BE 
 
 `--append-body` converts only the Markdown you pass and adds it after the existing description, which is kept as it
 is, including images, smart links and mentions, so `--allow-image-loss` isn't needed. It can't be combined with
-`--body` or `--template`, and mentions work as in `--body`.
+`--body` or `--template`, and mentions work as in `--body`. Used on its own, it updates only the description, so
+watchers are notified once.
 
 #### Assign
 The `assign` command lets you assign a user to an issue.

@@ -3,6 +3,7 @@ package md
 import (
 	"bytes"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -74,9 +75,9 @@ func (b *adfBuilder) block(n *bf.Node) []*adf.Node {
 		}
 		return []*adf.Node{{NodeType: kind, Content: b.blocks(n)}}
 	case bf.Item:
-		return []*adf.Node{{NodeType: adf.ChildNodeListItem, Content: b.blocks(n)}}
+		return []*adf.Node{{NodeType: adf.ChildNodeListItem, Content: nestable(b.blocks(n))}}
 	case bf.BlockQuote:
-		return []*adf.Node{{NodeType: adf.NodeBlockquote, Content: b.blocks(n)}}
+		return []*adf.Node{{NodeType: adf.NodeBlockquote, Content: nestable(b.blocks(n))}}
 	case bf.HorizontalRule:
 		return []*adf.Node{{NodeType: adf.NodeRule}}
 	case bf.CodeBlock:
@@ -91,12 +92,31 @@ func (b *adfBuilder) block(n *bf.Node) []*adf.Node {
 	return b.blocks(n)
 }
 
+// ADF only allows paragraphs, lists and code blocks in list items and
+// blockquotes, and Jira rejects the whole document otherwise, so headings
+// become paragraphs, nested quotes give up their quote and rules are dropped.
+func nestable(nodes []*adf.Node) []*adf.Node {
+	out := make([]*adf.Node, 0, len(nodes))
+	for _, n := range nodes {
+		switch n.NodeType {
+		case adf.NodeHeading:
+			out = append(out, &adf.Node{NodeType: adf.NodeParagraph, Content: n.Content})
+		case adf.NodeBlockquote:
+			out = append(out, n.Content...)
+		case adf.NodeRule:
+		default:
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
 func (b *adfBuilder) codeBlock(n *bf.Node) *adf.Node {
 	node := &adf.Node{NodeType: adf.NodeCodeBlock}
-	if info := strings.TrimSpace(string(n.Info)); info != "" {
+	if info := strings.TrimSpace(b.restore(string(n.Info))); info != "" {
 		node.Attributes = map[string]any{"language": info}
 	}
-	if code := strings.TrimRight(string(n.Literal), "\n"); code != "" {
+	if code := strings.TrimRight(b.restore(string(n.Literal)), "\n"); code != "" {
 		node.Content = []*adf.Node{textNode(code, nil)}
 	}
 	return node
@@ -152,7 +172,7 @@ func (b *adfBuilder) inlines(parent *bf.Node, marks []adf.MarkNode) []*adf.Node 
 			out = append(out, b.image(n, marks)...)
 		case bf.Code:
 			if len(n.Literal) > 0 {
-				out = append(out, textNode(string(n.Literal), codeMarks(marks)))
+				out = append(out, textNode(b.restore(string(n.Literal)), codeMarks(marks)))
 			}
 		case bf.Hardbreak, bf.Softbreak:
 			out = append(out, &adf.Node{NodeType: adf.InlineNodeHardBreak})
@@ -166,16 +186,17 @@ func (b *adfBuilder) inlines(parent *bf.Node, marks []adf.MarkNode) []*adf.Node 
 }
 
 func (b *adfBuilder) link(n *bf.Node, marks []adf.MarkNode) []*adf.Node {
-	if b.issueURL != nil && isBareLink(n) && b.issueURL.Match(n.Destination) {
+	dest := b.restore(string(n.Destination))
+	if b.issueURL != nil && isBareLink(n) && b.issueURL.MatchString(dest) {
 		return []*adf.Node{{
 			NodeType:   adf.InlineNodeCard,
-			Attributes: map[string]any{"url": string(n.Destination)},
+			Attributes: map[string]any{"url": dest},
 		}}
 	}
-	if len(n.Destination) == 0 {
+	if dest == "" {
 		return b.inlines(n, marks)
 	}
-	return b.inlines(n, withMark(marks, adf.MarkLink, map[string]any{"href": string(n.Destination)}))
+	return b.inlines(n, withMark(marks, adf.MarkLink, map[string]any{"href": dest}))
 }
 
 // ADF media has to be uploaded to Jira first, which is more than appending text
@@ -189,17 +210,31 @@ func (b *adfBuilder) image(n *bf.Node, marks []adf.MarkNode) []*adf.Node {
 		return bf.GoToNext
 	})
 
-	label := alt.String()
+	dest := b.restore(string(n.Destination))
+	label := b.restore(alt.String())
 	if label == "" {
-		label = string(n.Destination)
+		label = dest
 	}
 	if label == "" {
 		return nil
 	}
-	if len(n.Destination) > 0 {
-		marks = withMark(marks, adf.MarkLink, map[string]any{"href": string(n.Destination)})
+	// Jira rejects a second link mark, so an image inside a link keeps the outer one.
+	if dest != "" && !slices.ContainsFunc(marks, func(m adf.MarkNode) bool { return m.MarkType == adf.MarkLink }) {
+		marks = withMark(marks, adf.MarkLink, map[string]any{"href": dest})
 	}
 	return []*adf.Node{textNode(label, marks)}
+}
+
+// restore puts mentions back as written where they can't become mention nodes,
+// such as code and URLs, so the placeholders never reach Jira.
+func (b *adfBuilder) restore(s string) string {
+	return b.marker.ReplaceAllStringFunc(s, func(m string) string {
+		idx, err := strconv.Atoi(b.marker.FindStringSubmatch(m)[1])
+		if err != nil || idx >= len(b.mentions) {
+			return m
+		}
+		return b.mentions[idx]
+	})
 }
 
 // textNodes splits literal into text, mention and hard break nodes. A newline
