@@ -20,6 +20,7 @@ const (
 	NodeHeading     = NodeType("heading")
 	NodeOrderedList = NodeType("orderedList")
 	NodePanel       = NodeType("panel")
+	NodeRule        = NodeType("rule")
 	NodeParagraph   = NodeType("paragraph")
 	NodeTable       = NodeType("table")
 	NodeMedia       = NodeType("media")
@@ -274,4 +275,39 @@ func sanitize(s string) string {
 	s = strings.ReplaceAll(s, "<", "❬")
 	s = strings.ReplaceAll(s, ">", "❭")
 	return s
+}
+
+// Append adds the content of doc to the end of a, merging a leading list of doc
+// into a trailing list of a of the same type. Existing nodes are not modified
+// other than gaining list items. A nil a yields doc.
+func (a *ADF) Append(doc *ADF) *ADF {
+	if a == nil {
+		return doc
+	}
+	if doc == nil || len(doc.Content) == 0 {
+		return a
+	}
+
+	out := &ADF{Version: a.Version, DocType: a.DocType, Content: slices.Clone(a.Content)}
+	added := doc.Content
+
+	// Only the very last node is considered, so that a list is never pulled
+	// across other content the author placed after it.
+	if last := len(out.Content) - 1; last >= 0 {
+		tail, head := out.Content[last], added[0]
+		if isList(tail) && tail.NodeType == head.NodeType {
+			merged := *tail
+			merged.Content = append(slices.Clone(tail.Content), head.Content...)
+			out.Content[last] = &merged
+			added = added[1:]
+		}
+	}
+
+	out.Content = append(out.Content, added...)
+
+	return out
+}
+
+func isList(n *Node) bool {
+	return n != nil && (n.NodeType == NodeBulletList || n.NodeType == NodeOrderedList)
 }

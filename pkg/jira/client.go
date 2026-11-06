@@ -21,6 +21,7 @@ import (
 	"github.com/cloudflare/cloudflared/token"
 	"github.com/rs/zerolog"
 
+	"github.com/rethab/jira-cli/pkg/adf"
 	"github.com/rethab/jira-cli/pkg/md"
 )
 
@@ -255,6 +256,12 @@ func NewClient(c Config, opts ...ClientFunc) *Client {
 // Cloud, bare URLs of issues on the configured server become smart links.
 func (c *Client) ToJiraMD(markdown string) string {
 	return md.ToJiraMD(markdown, c.mdOptions...)
+}
+
+// ToADF translates CommonMark to ADF for the v3 API, with the same smart-link
+// handling as ToJiraMD.
+func (c *Client) ToADF(markdown string) *adf.ADF {
+	return md.ToADF(markdown, c.mdOptions...)
 }
 
 // cfAccessURL returns the URL to look up the Access application at. Access
