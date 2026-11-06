@@ -1,0 +1,140 @@
+{
+  "id": "10001",
+  "key": "TEST-1",
+  "fields": {
+    "description": {
+      "version": 1,
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {"type": "text", "text": "See "},
+            {
+              "type": "text",
+              "text": "the runbook",
+              "marks": [{"type": "link", "attrs": {"href": "https://example.com/runbook", "title": "Runbook"}}]
+            },
+            {"type": "text", "text": " and "},
+            {"type": "text", "text": "kubectl get pods", "marks": [{"type": "code"}]},
+            {"type": "text", "text": " from "},
+            {"type": "inlineCard", "attrs": {"url": "https://example.atlassian.net/browse/ABC-1"}},
+            {"type": "hardBreak"},
+            {
+              "type": "mention",
+              "attrs": {"id": "5b10a2844c20165700ede21g", "text": "@Alice", "accessLevel": "CONTAINER"}
+            },
+            {"type": "text", "text": " "},
+            {"type": "emoji", "attrs": {"shortName": ":smile:", "id": "1f604", "text": "😄"}},
+            {"type": "text", "text": " due "},
+            {"type": "date", "attrs": {"timestamp": "1700000000000"}},
+            {"type": "text", "text": " "},
+            {"type": "status", "attrs": {"text": "In progress", "color": "blue", "localId": "abc-123"}}
+          ]
+        },
+        {
+          "type": "mediaSingle",
+          "attrs": {"layout": "center", "width": 50},
+          "content": [
+            {
+              "type": "media",
+              "attrs": {
+                "id": "d3a1a2f4-0000-4000-8000-000000000001",
+                "type": "file",
+                "collection": "",
+                "width": 800,
+                "height": 600
+              }
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "attrs": {"panelType": "info"},
+          "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": "Heads up"}]}
+          ]
+        },
+        {
+          "type": "taskList",
+          "attrs": {"localId": "tl-1"},
+          "content": [
+            {
+              "type": "taskItem",
+              "attrs": {"localId": "ti-1", "state": "DONE"},
+              "content": [{"type": "text", "text": "Done"}]
+            },
+            {
+              "type": "taskItem",
+              "attrs": {"localId": "ti-2", "state": "TODO"},
+              "content": [{"type": "text", "text": "Todo"}]
+            }
+          ]
+        },
+        {
+          "type": "expand",
+          "attrs": {"title": "Details"},
+          "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": "Hidden"}]}
+          ]
+        },
+        {
+          "type": "orderedList",
+          "attrs": {"order": 3},
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": "third"}]}
+              ]
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "attrs": {"isNumberColumnEnabled": false, "layout": "default"},
+          "content": [
+            {
+              "type": "tableRow",
+              "content": [
+                {
+                  "type": "tableHeader",
+                  "attrs": {"colspan": 2, "rowspan": 1, "colwidth": [120, 80]},
+                  "content": [
+                    {"type": "paragraph", "content": [{"type": "text", "text": "Head", "marks": [{"type": "strong"}]}]}
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "tableRow",
+              "content": [
+                {
+                  "type": "tableCell",
+                  "attrs": {"colspan": 1, "rowspan": 1, "background": "#deebff"},
+                  "content": [{"type": "paragraph"}]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {"type": "inlineCard", "attrs": {"url": "https://example.atlassian.net/browse/ABC-2"}}
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

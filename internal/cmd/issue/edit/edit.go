@@ -45,6 +45,9 @@ $ jira issue edit ISSUE-1 --template /path/to/template.tmpl
 # Use minus (-) to read the template from standard input
 $ cat template.tmpl | jira issue edit ISSUE-1 --template -
 
+# Append to the description without rewriting it; a leading list joins a list the description ends with
+$ jira issue edit ISSUE-1 --append-body "- Runbook: https://example.com/runbook" --no-input
+
 # Use pipe to read the description body directly from standard input
 $ echo "Description from stdin" | jira issue edit ISSUE-1 -s"New updated summary"  --no-input
 
@@ -80,6 +83,8 @@ func edit(cmd *cobra.Command, args []string) {
 	project := viper.GetString("project.key")
 
 	params := parseArgsAndFlags(cmd.Flags(), args, project)
+	params.appendBodySet = cmd.Flags().Changed("append-body")
+	cmdutil.ExitIfError(checkAppendBody(params))
 	cmdutil.ExitIfError(loadTemplate(params))
 
 	client := api.DefaultClient(params.debug)
@@ -119,7 +124,7 @@ func edit(cmd *cobra.Command, args []string) {
 
 	// Use stdin only if nothing is passed to --body or --template; --template - has
 	// already consumed and closed it, so reading again would fail.
-	if params.body == "" && params.template == "" && cmdutil.StdinHasData() {
+	if shouldReadBodyFromStdin(params, cmdutil.StdinHasData()) {
 		b, err := cmdutil.ReadFile("-")
 		if err != nil {
 			cmdutil.Failed("Error: %s", err)
@@ -134,6 +139,9 @@ func edit(cmd *cobra.Command, args []string) {
 	cmdutil.ExitIfError(checkImageLoss(issue, params))
 
 	params.body = cmdcommon.ResolveMentions(client, params.issueKey, project, params.body, params.noInput)
+	if params.appendBody != "" {
+		params.appendBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.appendBody, params.noInput)
+	}
 
 	edr := buildEditRequest(client, project, issue, params)
 	edr.WithCustomFields(customFields)
@@ -149,6 +157,19 @@ func edit(cmd *cobra.Command, args []string) {
 			"if it does and the issue's status isn't in the new type's workflow, move the issue in the Jira web UI instead")
 	}
 	cmdutil.ExitIfError(err)
+
+	if params.appendBody != "" {
+		local := viper.GetString("installation") == jira.InstallationTypeLocal
+		err := func() error {
+			s := cmdutil.Info("Appending to the description...")
+			defer s.Stop()
+
+			return appendDescription(client, params.issueKey, params.appendBody, local, params.skipNotify)
+		}()
+		if err != nil {
+			cmdutil.Failed("Other changes were saved, but appending to the description failed: %s", err)
+		}
+	}
 
 	cmdutil.Success("Issue updated\n%s", cmdutil.GenerateServerBrowseURL(server, params.issueKey))
 
@@ -372,7 +393,7 @@ func (ec *editCmd) questions(issue *jira.Issue, originalBody string) []*survey.Q
 		})
 	}
 
-	if ec.params.body != "" {
+	if ec.params.body != "" || ec.params.appendBody != "" {
 		return qs
 	}
 	// Any change made in the editor would be refused by checkImageLoss, discarding
@@ -410,6 +431,8 @@ type editParams struct {
 	summary          string
 	body             string
 	template         string
+	appendBody       string
+	appendBodySet    bool
 	priority         string
 	assignee         string
 	labels           []string
@@ -452,6 +475,9 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 	cmdutil.ExitIfError(err)
 
 	template, err := flags.GetString("template")
+	cmdutil.ExitIfError(err)
+
+	appendBody, err := flags.GetString("append-body")
 	cmdutil.ExitIfError(err)
 
 	priority, err := flags.GetString("priority")
@@ -502,6 +528,7 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 		summary:          summary,
 		body:             body,
 		template:         template,
+		appendBody:       appendBody,
 		priority:         priority,
 		assignee:         assignee,
 		labels:           labels,
@@ -597,6 +624,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("summary", "s", "", "Edit summary or title")
 	cmd.Flags().StringP("body", "b", "", "Edit description")
 	cmd.Flags().StringP("template", "T", "", "Path to a file to read the description from, or - for standard input")
+	cmd.Flags().String("append-body", "", "Append Markdown to the end of the description, leaving the existing content untouched")
 	cmd.Flags().StringP("priority", "y", "", "Edit priority")
 	cmd.Flags().StringP("assignee", "a", "", "Edit assignee (email or display name)")
 	cmd.Flags().StringArrayP("label", "l", []string{}, "Append labels")

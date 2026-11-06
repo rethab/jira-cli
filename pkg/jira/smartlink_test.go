@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/rethab/jira-cli/pkg/adf"
 )
 
 const (
@@ -37,6 +39,18 @@ func TestClientToJiraMDSmartLinks(t *testing.T) {
 			assert.Equal(t, tc.expected, client.ToJiraMD(smartLinkMD))
 		})
 	}
+}
+
+func TestClientToADFSmartLinks(t *testing.T) {
+	const url = "https://example.atlassian.net/browse/ABC-264"
+
+	cloud := NewClient(Config{Server: smartLinkServer, Installation: InstallationTypeCloud}).ToADF(url)
+	require.Len(t, cloud.Content, 1)
+	require.Len(t, cloud.Content[0].Content, 1)
+	assert.Equal(t, adf.InlineNodeCard, cloud.Content[0].Content[0].NodeType)
+
+	local := NewClient(Config{Server: smartLinkServer, Installation: InstallationTypeLocal}).ToADF(url)
+	assert.Equal(t, adf.ChildNodeText, local.Content[0].Content[0].NodeType)
 }
 
 // With a scoped token, the server is the API gateway, which nobody links to.
