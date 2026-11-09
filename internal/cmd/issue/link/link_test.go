@@ -1,6 +1,7 @@
 package link
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -12,7 +13,10 @@ import (
 var blocks = &jira.IssueLinkType{ID: "10000", Name: "Blocks", Outward: "blocks", Inward: "is blocked by"}
 
 func TestLinkTypeOption(t *testing.T) {
-	assert.Equal(t, "Blocks: blocks", linkTypeOption(blocks))
+	option := linkTypeOption("TEST-1", "TEST-2", blocks)
+
+	assert.Equal(t, "Blocks: TEST-1 blocks TEST-2", option)
+	assert.Equal(t, "Blocks", strings.Split(option, ":")[0])
 }
 
 func TestLinkedMessage(t *testing.T) {

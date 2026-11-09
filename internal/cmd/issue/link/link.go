@@ -100,9 +100,10 @@ func link(cmd *cobra.Command, args []string) {
 	}
 }
 
-// linkTypeOption shows the outward wording because the first issue gets it, which is how the link reads.
-func linkTypeOption(t *jira.IssueLinkType) string {
-	return fmt.Sprintf("%s: %s", t.Name, t.Outward)
+// linkTypeOption spells out the link with the chosen keys, so the prompt shows which way round it goes.
+// The name comes first and is followed by a colon, which setDesiredLinkType relies on to get it back.
+func linkTypeOption(inwardKey, outwardKey string, t *jira.IssueLinkType) string {
+	return fmt.Sprintf("%s: %s %s %s", t.Name, inwardKey, t.Outward, outwardKey)
 }
 
 func linkedMessage(inwardKey, outwardKey string, t *jira.IssueLinkType) string {
@@ -155,7 +156,7 @@ func (lc *linkCmd) setInwardIssueKey(project string) error {
 
 	qs := &survey.Question{
 		Name:     "inwardIssueKey",
-		Prompt:   &survey.Input{Message: "Inward issue key"},
+		Prompt:   &survey.Input{Message: "First issue key"},
 		Validate: survey.Required,
 	}
 	if err := survey.Ask([]*survey.Question{qs}, &ans); err != nil {
@@ -175,7 +176,7 @@ func (lc *linkCmd) setOutwardIssueKey(project string) error {
 
 	qs := &survey.Question{
 		Name:     "outwardIssueKey",
-		Prompt:   &survey.Input{Message: "Outward issue key"},
+		Prompt:   &survey.Input{Message: "Second issue key"},
 		Validate: survey.Required,
 	}
 	if err := survey.Ask([]*survey.Question{qs}, &ans); err != nil {
@@ -206,7 +207,7 @@ func (lc *linkCmd) setDesiredLinkType() error {
 
 	options := make([]string, 0, len(lc.linkTypes))
 	for _, t := range lc.linkTypes {
-		options = append(options, linkTypeOption(t))
+		options = append(options, linkTypeOption(lc.params.inwardIssueKey, lc.params.outwardIssueKey, t))
 	}
 	options = append(options, optionCancel)
 

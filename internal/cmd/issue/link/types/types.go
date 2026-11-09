@@ -64,21 +64,23 @@ func format(types []*jira.IssueLinkType, plain bool) string {
 		return ""
 	}
 
+	lines := make([]string, 0, len(types)+1)
+	if !plain {
+		lines = append(lines, "NAME\tOUTWARD\tINWARD")
+	}
+	for _, t := range types {
+		lines = append(lines, strings.Join([]string{t.Name, t.Outward, t.Inward}, "\t"))
+	}
+
 	// tabwriter would pad the columns, and scripts need the bare tabs.
 	if plain {
-		lines := make([]string, 0, len(types))
-		for _, t := range types {
-			lines = append(lines, t.Name+"\t"+t.Outward+"\t"+t.Inward)
-		}
 		return strings.Join(lines, "\n")
 	}
 
 	var b strings.Builder
-
 	w := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "NAME\tOUTWARD\tINWARD")
-	for _, t := range types {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", t.Name, t.Outward, t.Inward)
+	for _, l := range lines {
+		_, _ = fmt.Fprintln(w, l)
 	}
 	_ = w.Flush()
 
