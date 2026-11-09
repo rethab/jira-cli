@@ -47,6 +47,7 @@ PR asking for it.
   [#975]
 - `jira issue attachment add|list|download`: upload, list, and download attachments. [#986]
 - `jira issue transitions`: list the transitions an issue can take, without moving it.
+- `jira issue link types`: list link type names with their outward and inward wording.
 - `jira issue changelog`: print an issue's change history, optionally for one field.
 - `jira issue fields -t TYPE`: list the fields a create screen needs, with the values `--custom` accepts.
 - `jira issue unlink remote`: remove a remote web link. [#1006]
@@ -73,6 +74,8 @@ PR asking for it.
 - `@[Name]` in issue, epic, and comment bodies becomes a real mention, and editing keeps existing mentions. [#407]
 - Issue URLs of your own site render as smart links on Jira Cloud.
 - `jira issue view` shows the parent issue. [#766]
+- `jira issue link` prints the link as it reads ("A blocks B"), and its prompt and help say which issue gets which
+  wording.
 - `jira issue edit` won't replace a description that embeds images unless `--allow-image-loss` is passed. [#1005]
 - An HTML response from an SSO redirect, VPN portal, or proxy gives a readable error. [#630]
 - Releases ship SLSA provenance and an SBOM; every merge to `main` publishes a snapshot cask and Docker image.
@@ -704,8 +707,22 @@ The `link` command lets you link two issues.
 # Link an issue using an interactive prompt
 $ jira issue link
 
-# Pass required parameters to skip prompt
+# Pass required parameters to skip prompt. ISSUE-1 blocks ISSUE-2
 $ jira issue link ISSUE-1 ISSUE-2 Blocks
+```
+
+The first issue gets the link type's outward wording and the second the inward one, so the example reads "ISSUE-1
+blocks ISSUE-2" and "ISSUE-2 is blocked by ISSUE-1".
+
+##### Types
+The `types` command lists the link types of your Jira instance.
+
+```sh
+# List link type names with their outward and inward wording
+$ jira issue link types
+
+# Tab separated name, outward and inward wording, for scripts
+$ jira issue link types --plain
 ```
 
 ##### Remote
