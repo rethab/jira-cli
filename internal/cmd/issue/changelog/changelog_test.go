@@ -96,3 +96,86 @@ func TestAuthor(t *testing.T) {
 	assert.Equal(t, "jdoe", author(jira.User{Name: "jdoe"}))
 	assert.Equal(t, "Automation", author(jira.User{}))
 }
+
+func descriptionChange(from, to string) []jira.ChangelogHistory {
+	return []jira.ChangelogHistory{{
+		Author:  jira.User{DisplayName: "Jane Doe"},
+		Created: "2026-10-01T14:03:00.000+0000",
+		Items:   []jira.ChangelogItem{{Field: "description", FromString: from, ToString: to}},
+	}}
+}
+
+func TestFormatDiff(t *testing.T) {
+	original := time.Local
+	time.Local = time.UTC
+	t.Cleanup(func() { time.Local = original })
+
+	const header = "2026-10-01 14:03  Jane Doe  description\n"
+	const from = "Steps:\nopen the page\nclick save"
+	const to = "Steps:\nopen the page\nclick save twice"
+	const wantMultiLine = header + "--- from\n+++ to\n@@ -1,3 +1,3 @@\n Steps:\n open the page\n-click save\n+click save twice"
+
+	t.Run("multi-line change keeps line breaks", func(t *testing.T) {
+		assert.Equal(t, wantMultiLine, formatDiff(descriptionChange(from, to)))
+	})
+
+	t.Run("crlf is normalised", func(t *testing.T) {
+		crlf := "Steps:\r\nopen the page\r\nclick save"
+
+		assert.Equal(t, wantMultiLine, formatDiff(descriptionChange(crlf, to)))
+	})
+
+	t.Run("no missing newline marker", func(t *testing.T) {
+		assert.NotContains(t, formatDiff(descriptionChange(from, to)), "No newline")
+	})
+
+	t.Run("field set for the first time", func(t *testing.T) {
+		want := header + "--- from\n+++ to\n@@ -0,0 +1,2 @@\n+first line\n+second line"
+
+		assert.Equal(t, want, formatDiff(descriptionChange("", "first line\nsecond line")))
+	})
+
+	t.Run("field cleared", func(t *testing.T) {
+		want := header + "--- from\n+++ to\n@@ -1,2 +0,0 @@\n-a\n-b"
+
+		assert.Equal(t, want, formatDiff(descriptionChange("a\nb", "")))
+	})
+
+	t.Run("one-line fields and fallback to ids", func(t *testing.T) {
+		want := "2026-10-01 14:03  Jane Doe  status\n--- from\n+++ to\n@@ -1 +1 @@\n-In Testing\n+To Do\n\n" +
+			"2026-10-01 14:03  Jane Doe  Fix Version\n--- from\n+++ to\n@@ -0,0 +1 @@\n+1.0\n\n" +
+			"not a date  Automation  assignee\n--- from\n+++ to\n@@ -1 +0,0 @@\n-abc"
+
+		assert.Equal(t, want, formatDiff(sample()))
+	})
+
+	t.Run("identical values", func(t *testing.T) {
+		assert.Equal(t, header+"(values are identical)", formatDiff(descriptionChange("same\ntext", "same\ntext")))
+	})
+
+	t.Run("only line endings differ", func(t *testing.T) {
+		assert.Equal(t, header+"(only line endings or a trailing line break differ)",
+			formatDiff(descriptionChange("a\r\nb", "a\nb")))
+	})
+
+	t.Run("only a trailing line break differs", func(t *testing.T) {
+		assert.Equal(t, header+"(only line endings or a trailing line break differ)",
+			formatDiff(descriptionChange("a\nb", "a\nb\n")))
+	})
+
+	t.Run("no histories", func(t *testing.T) {
+		assert.Empty(t, formatDiff(nil))
+	})
+}
+
+func TestDiffText(t *testing.T) {
+	for in, want := range map[string]string{
+		"":       "",
+		"a":      "a\n",
+		"a\n":    "a\n",
+		"a\r\nb": "a\nb\n",
+		"a\rb":   "a\nb\n",
+	} {
+		assert.Equal(t, want, diffText(in), "input %q", in)
+	}
+}

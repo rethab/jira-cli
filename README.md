@@ -49,7 +49,8 @@ PR asking for it.
 - `jira issue transitions`: list the transitions an issue can take, without moving it.
 - `jira issue link types`: list link type names with their outward and inward wording.
 - `jira issue link remote list`: list an issue's remote web links with id, title and URL. [#873]
-- `jira issue changelog`: print an issue's change history, optionally for one field.
+- `jira issue changelog`: print an issue's change history, optionally for one field, or as a unified diff per change
+  with `--diff`.
 - `jira issue fields -t TYPE`: list the fields a create screen needs, with the values `--custom` accepts.
 - `jira issue unlink remote`: remove a remote web link. [#1006]
 - `jira release create`: create a project version. [#1002]
@@ -704,7 +705,13 @@ $ jira issue changelog ISSUE-1 --field status
 
 # Tab separated "created", "author", "field", "from" and "to", for scripts
 $ jira issue changelog ISSUE-1 --field status --plain
+
+# Show what changed in the description, as a unified diff per change with line breaks kept
+$ jira issue changelog ISSUE-1 --field description --diff
 ```
+
+`--diff` prints a block per change, with a header and a unified diff of the old and new value, and can't be combined
+with `--plain`.
 
 #### Link
 The `link` command lets you link two issues.
