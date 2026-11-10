@@ -308,6 +308,38 @@ func (a *ADF) Append(doc *ADF) *ADF {
 	return out
 }
 
+// Prepend adds the content of doc before the content of a, merging a trailing
+// list of doc into a leading list of a of the same type. Existing nodes are not
+// modified other than gaining list items, and the merged list keeps a's attrs.
+// A nil a yields doc.
+func (a *ADF) Prepend(doc *ADF) *ADF {
+	if a == nil {
+		return doc
+	}
+	if doc == nil || len(doc.Content) == 0 {
+		return a
+	}
+
+	out := &ADF{Version: a.Version, DocType: a.DocType, Content: slices.Clone(a.Content)}
+	added := doc.Content
+
+	// Only the first node is considered, so that a list is never pulled
+	// across other content the author placed before it.
+	if len(out.Content) > 0 {
+		head, tail := out.Content[0], added[len(added)-1]
+		if isList(head) && head.NodeType == tail.NodeType {
+			merged := *head
+			merged.Content = append(slices.Clone(tail.Content), head.Content...)
+			out.Content[0] = &merged
+			added = added[:len(added)-1]
+		}
+	}
+
+	out.Content = append(slices.Clone(added), out.Content...)
+
+	return out
+}
+
 func isList(n *Node) bool {
 	return n != nil && (n.NodeType == NodeBulletList || n.NodeType == NodeOrderedList)
 }
