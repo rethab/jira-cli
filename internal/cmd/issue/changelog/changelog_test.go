@@ -153,6 +153,16 @@ func TestFormatDiff(t *testing.T) {
 		assert.Equal(t, header+"(values are identical)", formatDiff(descriptionChange("same\ntext", "same\ntext")))
 	})
 
+	t.Run("only line endings differ", func(t *testing.T) {
+		assert.Equal(t, header+"(only line endings or a trailing line break differ)",
+			formatDiff(descriptionChange("a\r\nb", "a\nb")))
+	})
+
+	t.Run("only a trailing line break differs", func(t *testing.T) {
+		assert.Equal(t, header+"(only line endings or a trailing line break differ)",
+			formatDiff(descriptionChange("a\nb", "a\nb\n")))
+	})
+
 	t.Run("no histories", func(t *testing.T) {
 		assert.Empty(t, formatDiff(nil))
 	})

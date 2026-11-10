@@ -41,6 +41,9 @@ $ jira issue changelog ISSUE-1 --field description --diff`
 // Only the one-line modes use it, --diff keeps the line breaks.
 var flatten = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ", "\t", " ")
 
+// Server/DC may store \r\n, which would make every line of a diff look changed.
+var normaliseLineEndings = strings.NewReplacer("\r\n", "\n", "\r", "\n")
+
 // NewCmdChangelog is a changelog command.
 func NewCmdChangelog() *cobra.Command {
 	cmd := cobra.Command{
@@ -168,11 +171,16 @@ func formatDiff(histories []jira.ChangelogHistory) string {
 		for _, it := range h.Items {
 			header := strings.Join([]string{created(h.Created), author(h.Author), it.Field}, "  ")
 
-			from, to := diffText(value(it.FromString, it.From)), diffText(value(it.ToString, it.To))
-			body := strings.TrimSuffix(udiff.Unified("from", "to", from, to), "\n")
-			if body == "" {
+			rawFrom, rawTo := value(it.FromString, it.From), value(it.ToString, it.To)
+			body := strings.TrimSuffix(udiff.Unified("from", "to", diffText(rawFrom), diffText(rawTo)), "\n")
+			switch {
+			case body != "":
+			case rawFrom == rawTo:
 				// Jira sometimes logs a change whose old and new text are the same.
 				body = "(values are identical)"
+			default:
+				// Normalising hid the difference, so don't claim the values are the same.
+				body = "(only line endings or a trailing line break differ)"
 			}
 
 			blocks = append(blocks, header+"\n"+body)
@@ -182,11 +190,10 @@ func formatDiff(histories []jira.ChangelogHistory) string {
 	return strings.Join(blocks, "\n\n")
 }
 
-// diffText normalises line endings, because Server/DC may store \r\n. It also ends a non-empty value
-// with a newline, as Jira values have none and udiff would otherwise add a "No newline at end of file" marker.
+// diffText also ends a non-empty value with a newline, as Jira values have none and udiff would
+// otherwise add a "No newline at end of file" marker.
 func diffText(s string) string {
-	s = strings.ReplaceAll(s, "\r\n", "\n")
-	s = strings.ReplaceAll(s, "\r", "\n")
+	s = normaliseLineEndings.Replace(s)
 	if s != "" && !strings.HasSuffix(s, "\n") {
 		s += "\n"
 	}
