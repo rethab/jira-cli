@@ -37,10 +37,6 @@ $ jira issue changelog ISSUE-1 --field description --diff`
 	noAuthor       = "Automation"
 )
 
-// Values like a changed description span several lines, which would break one line per change.
-// Only the one-line modes use it, --diff keeps the line breaks.
-var flatten = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ", "\t", " ")
-
 // Server/DC may store \r\n, which would make every line of a diff look changed.
 var normaliseLineEndings = strings.NewReplacer("\r\n", "\n", "\r", "\n")
 
@@ -137,7 +133,7 @@ func format(histories []jira.ChangelogHistory, plain bool) string {
 
 	for _, h := range histories {
 		for _, it := range h.Items {
-			from, to := flatten.Replace(value(it.FromString, it.From)), flatten.Replace(value(it.ToString, it.To))
+			from, to := cmdutil.SingleLine(value(it.FromString, it.From)), cmdutil.SingleLine(value(it.ToString, it.To))
 
 			if plain {
 				lines = append(lines, strings.Join([]string{h.Created, author(h.Author), it.Field, from, to}, "\t"))

@@ -229,3 +229,12 @@ func GetTUIStyleConfig() tui.TableStyle {
 		SelectionTextIsBold: bold,
 	}
 }
+
+// Free text such as titles or field values can span lines or hold tabs, which would break one line per row
+// in tab separated output.
+var singleLine = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ", "\t", " ")
+
+// SingleLine replaces line breaks and tabs in s with spaces.
+func SingleLine(s string) string {
+	return singleLine.Replace(s)
+}

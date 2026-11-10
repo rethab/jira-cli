@@ -48,6 +48,7 @@ PR asking for it.
 - `jira issue attachment add|list|download`: upload, list, and download attachments. [#986]
 - `jira issue transitions`: list the transitions an issue can take, without moving it.
 - `jira issue link types`: list link type names with their outward and inward wording.
+- `jira issue link remote list`: list an issue's remote web links with id, title and URL. [#873]
 - `jira issue changelog`: print an issue's change history, optionally for one field, or as a unified diff per change
   with `--diff`.
 - `jira issue fields -t TYPE`: list the fields a create screen needs, with the values `--custom` accepts.
@@ -90,6 +91,7 @@ The fork also fixes a number of open upstream bugs; see the [commit history](htt
 [#801]: https://github.com/ankitpokhrel/jira-cli/pull/801
 [#847]: https://github.com/ankitpokhrel/jira-cli/issues/847
 [#850]: https://github.com/ankitpokhrel/jira-cli/issues/850
+[#873]: https://github.com/ankitpokhrel/jira-cli/pull/873
 [#885]: https://github.com/ankitpokhrel/jira-cli/issues/885
 [#908]: https://github.com/ankitpokhrel/jira-cli/pull/908
 [#933]: https://github.com/ankitpokhrel/jira-cli/issues/933
@@ -745,7 +747,16 @@ $ jira issue link remote
 
 # Pass required parameters to skip prompt
 $ jira issue link remote ISSUE-1 https://example.com "Example text"
+
+# List the remote web links of an issue
+$ jira issue link remote list ISSUE-1
+
+# Tab separated id, title and URL, for scripts
+$ jira issue link remote list ISSUE-1 --plain
 ```
+
+The list includes the links Confluence adds when a page mentions the issue. The URL it shows is the one
+`jira issue unlink remote` takes.
 
 #### Unlink
 The `unlink` command lets you unlink two linked issues.

@@ -8,13 +8,17 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/rethab/jira-cli/api"
+	"github.com/rethab/jira-cli/internal/cmd/issue/link/remote/list"
 	"github.com/rethab/jira-cli/internal/cmdutil"
 	"github.com/rethab/jira-cli/pkg/jira"
 )
 
 const (
 	helpText = `Adds a remote web link to an issue`
-	examples = `$ jira issue link remote ISSUE-1 http://weblink.com weblink-title`
+	examples = `$ jira issue link remote ISSUE-1 http://weblink.com weblink-title
+
+# List the remote links of an issue
+$ jira issue link remote list ISSUE-1`
 )
 
 // NewCmdRemoteLink is a link command.
@@ -32,6 +36,8 @@ func NewCmdRemoteLink() *cobra.Command {
 		},
 		Run: remotelink,
 	}
+
+	cmd.AddCommand(list.NewCmdRemoteLinkList())
 
 	return &cmd
 }

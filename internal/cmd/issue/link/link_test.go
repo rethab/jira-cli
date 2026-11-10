@@ -37,6 +37,24 @@ func TestRouting(t *testing.T) {
 		assert.Equal(t, "types", cmd.Name())
 	})
 
+	t.Run("remote list subcommand", func(t *testing.T) {
+		for _, name := range []string{"list", "ls"} {
+			cmd, args, err := root.Find([]string{"issue", "link", "remote", name, "TEST-1"})
+
+			assert.NoError(t, err)
+			assert.Equal(t, "list", cmd.Name())
+			assert.Equal(t, []string{"TEST-1"}, args)
+		}
+	})
+
+	t.Run("remote positional form", func(t *testing.T) {
+		cmd, args, err := root.Find([]string{"issue", "link", "remote", "TEST-1", "https://example.com", "Example"})
+
+		assert.NoError(t, err)
+		assert.Equal(t, "remote", cmd.Name())
+		assert.Equal(t, []string{"TEST-1", "https://example.com", "Example"}, args)
+	})
+
 	t.Run("positional form", func(t *testing.T) {
 		cmd, args, err := root.Find([]string{"issue", "link", "TEST-1", "TEST-2", "Blocks"})
 
