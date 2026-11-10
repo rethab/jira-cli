@@ -126,19 +126,8 @@ func appendWiki(existing, added string) string {
 // the line right above it.
 func prependWiki(existing, added string) string {
 	existing = strings.TrimLeft(existing, "\r\n")
-	added = strings.TrimRight(added, "\r\n")
 	if strings.TrimSpace(existing) == "" {
-		return added
+		return strings.TrimRight(added, "\r\n")
 	}
-	if added == "" {
-		return existing
-	}
-
-	lastLine := added[strings.LastIndex(added, "\n")+1:]
-	firstLine, _, _ := strings.Cut(existing, "\n")
-
-	if kind := lineKind(lastLine); kind != wikiOther && kind == lineKind(firstLine) {
-		return added + "\n" + existing
-	}
-	return added + "\n\n" + existing
+	return appendWiki(added, existing)
 }

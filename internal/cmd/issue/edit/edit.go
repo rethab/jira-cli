@@ -143,13 +143,8 @@ func edit(cmd *cobra.Command, args []string) {
 	cmdutil.ExitIfError(checkImageLoss(issue, params))
 
 	params.body = cmdcommon.ResolveMentions(client, params.issueKey, project, params.body, params.noInput)
-	if params.appendBody != "" {
-		params.appendBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.appendBody, params.noInput)
-	}
-
-	if params.prependBody != "" {
-		params.prependBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.prependBody, params.noInput)
-	}
+	params.appendBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.appendBody, params.noInput)
+	params.prependBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.prependBody, params.noInput)
 
 	descriptionOnly := onlyAddingToDescription(params)
 	if !descriptionOnly {
