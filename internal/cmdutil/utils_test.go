@@ -254,3 +254,10 @@ func TestGetSubtaskHandle(t *testing.T) {
 		})
 	}
 }
+
+func TestSingleLine(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "a b c d e", SingleLine("a\r\nb\nc\rd\te"))
+	assert.Equal(t, "unchanged", SingleLine("unchanged"))
+}

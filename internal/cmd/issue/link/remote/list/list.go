@@ -24,9 +24,6 @@ The URL is what "jira issue unlink remote" takes to remove a link.`
 $ jira issue link remote list ISSUE-1 --plain`
 )
 
-// Titles are free text and would break one line per link.
-var flatten = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ", "\t", " ")
-
 // NewCmdRemoteLinkList is a remote link list command.
 func NewCmdRemoteLinkList() *cobra.Command {
 	cmd := cobra.Command{
@@ -77,7 +74,7 @@ func format(links []*jira.RemoteLink, plain bool) string {
 		lines = append(lines, "ID\tTITLE\tURL")
 	}
 	for _, l := range links {
-		lines = append(lines, strings.Join([]string{strconv.Itoa(l.ID), flatten.Replace(l.Object.Title), l.Object.URL}, "\t"))
+		lines = append(lines, strings.Join([]string{strconv.Itoa(l.ID), cmdutil.SingleLine(l.Object.Title), l.Object.URL}, "\t"))
 	}
 
 	// tabwriter would pad the columns, and scripts need the bare tabs.
