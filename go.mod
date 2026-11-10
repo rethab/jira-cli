@@ -7,6 +7,7 @@ toolchain go1.26.10
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/atotto/clipboard v0.1.4
+	github.com/aymanbagabas/go-udiff v0.2.0
 	github.com/briandowns/spinner v1.23.2
 	github.com/charmbracelet/glamour v1.0.0
 	github.com/cli/safeexec v1.0.1

@@ -6,6 +6,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/aymanbagabas/go-udiff"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -17,14 +18,19 @@ import (
 const (
 	helpText = `Changelog prints the history of an issue, one line per changed field, oldest first.
 
-Each line shows when the change happened, who made it, the field, and the old and new value.`
+Each line shows when the change happened, who made it, the field, and the old and new value.
+Line breaks in a value are flattened to spaces. With --diff, each change is printed as a header
+and a unified diff of the old and new value instead, which keeps the line breaks.`
 	examples = `$ jira issue changelog ISSUE-1
 
 # Only the status changes
 $ jira issue changelog ISSUE-1 --field status
 
 # Tab separated "created", "author", "field", "from" and "to", for scripts
-$ jira issue changelog ISSUE-1 --field status --plain`
+$ jira issue changelog ISSUE-1 --field status --plain
+
+# What changed in the description, as a unified diff per change
+$ jira issue changelog ISSUE-1 --field description --diff`
 
 	jiraTimeLayout = "2006-01-02T15:04:05.000-0700"
 	displayLayout  = "2006-01-02 15:04"
@@ -32,6 +38,7 @@ $ jira issue changelog ISSUE-1 --field status --plain`
 )
 
 // Values like a changed description span several lines, which would break one line per change.
+// Only the one-line modes use it, --diff keeps the line breaks.
 var flatten = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ", "\t", " ")
 
 // NewCmdChangelog is a changelog command.
@@ -53,6 +60,7 @@ func NewCmdChangelog() *cobra.Command {
 
 	cmd.Flags().String("field", "", "Only show changes of this field, eg: status")
 	cmd.Flags().Bool("plain", false, "Print tab separated created, author, field, from and to")
+	cmd.Flags().Bool("diff", false, "Print each change as a unified diff of the old and new value, keeping line breaks")
 
 	return &cmd
 }
@@ -67,6 +75,13 @@ func changelog(cmd *cobra.Command, args []string) {
 	plain, err := cmd.Flags().GetBool("plain")
 	cmdutil.ExitIfError(err)
 
+	diff, err := cmd.Flags().GetBool("diff")
+	cmdutil.ExitIfError(err)
+
+	if diff && plain {
+		cmdutil.Failed("--diff can't be combined with --plain")
+	}
+
 	client := api.DefaultClient(viper.GetBool("debug"))
 
 	histories, err := func() ([]jira.ChangelogHistory, error) {
@@ -77,7 +92,16 @@ func changelog(cmd *cobra.Command, args []string) {
 	}()
 	cmdutil.ExitIfError(err)
 
-	if out := format(filter(histories, field), plain); out != "" {
+	histories = filter(histories, field)
+
+	var out string
+	if diff {
+		out = formatDiff(histories)
+	} else {
+		out = format(histories, plain)
+	}
+
+	if out != "" {
 		fmt.Println(out)
 	}
 }
@@ -135,6 +159,38 @@ func format(histories []jira.ChangelogHistory, plain bool) string {
 	_ = w.Flush()
 
 	return strings.TrimSuffix(b.String(), "\n")
+}
+
+func formatDiff(histories []jira.ChangelogHistory) string {
+	var blocks []string
+
+	for _, h := range histories {
+		for _, it := range h.Items {
+			header := strings.Join([]string{created(h.Created), author(h.Author), it.Field}, "  ")
+
+			from, to := diffText(value(it.FromString, it.From)), diffText(value(it.ToString, it.To))
+			body := strings.TrimSuffix(udiff.Unified("from", "to", from, to), "\n")
+			if body == "" {
+				// Jira sometimes logs a change whose old and new text are the same.
+				body = "(values are identical)"
+			}
+
+			blocks = append(blocks, header+"\n"+body)
+		}
+	}
+
+	return strings.Join(blocks, "\n\n")
+}
+
+// diffText normalises line endings, because Server/DC may store \r\n. It also ends a non-empty value
+// with a newline, as Jira values have none and udiff would otherwise add a "No newline at end of file" marker.
+func diffText(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
+	if s != "" && !strings.HasSuffix(s, "\n") {
+		s += "\n"
+	}
+	return s
 }
 
 func created(s string) string {
