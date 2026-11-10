@@ -57,8 +57,8 @@ PR asking for it.
 **New flags**
 
 - `jira issue edit --type`: change the issue type in place.
-- `jira issue edit --original-estimate` [#801], `--template`, and `--append-body` (add to the description without
-  rewriting it).
+- `jira issue edit --original-estimate` [#801], `--template`, and `--append-body`/`--prepend-body` (add to the end
+  or start of the description without rewriting it).
 - `jira issue transitions --fields`: list the fields each transition's screen asks for.
 - `jira issue move --path [--yes]`: find and take the transitions to a status several steps away.
 - `jira issue view --description`: print only the summary and description. [#933]
@@ -531,6 +531,9 @@ $ cat template.tmpl | jira issue edit ISSUE-1 --template -
 # Append to the description without rewriting it; a leading list joins a list the description ends with
 $ jira issue edit ISSUE-1 --append-body "- Runbook: https://example.com/runbook" --no-input
 
+# Insert at the start of the description; images and other content below stay as they are
+$ jira issue edit ISSUE-1 --prepend-body "**Update:** fixed in v2.0" --no-input
+
 # In the interactive prompt, "OriginalEstimate" can be picked under "What would you like to add?"
 
 # Set custom fields, by name or by id; cascading selects take "Parent->Child"
@@ -547,7 +550,8 @@ $ jira issue edit ISSUE-1 --label -p2 --label p1 --component -FE --component BE 
 `--append-body` converts only the Markdown you pass and adds it after the existing description, which is kept as it
 is, including images, smart links and mentions, so `--allow-image-loss` isn't needed. It can't be combined with
 `--body` or `--template`, and mentions work as in `--body`. Used on its own, it updates only the description, so
-watchers are notified once.
+watchers are notified once. `--prepend-body` does the same at the start of the description, and a list it ends with
+joins a list the description starts with. The two flags can be combined in one update.
 
 #### Assign
 The `assign` command lets you assign a user to an issue.
