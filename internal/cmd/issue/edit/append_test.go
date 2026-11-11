@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -40,6 +41,17 @@ func TestCheckDescriptionAdditions(t *testing.T) {
 			name:    "explicitly empty",
 			params:  &editParams{appendBody: "", appendBodySet: true},
 			wantErr: "--append-body is empty",
+		},
+		{name: "replace alone", params: &editParams{replacements: []replacement{{"a", "b"}}}},
+		{
+			name:    "replace with body",
+			params:  &editParams{replacements: []replacement{{"a", "b"}}, body: "b"},
+			wantErr: "--replace-body can't be combined with --body or --template",
+		},
+		{
+			name:    "replace with template",
+			params:  &editParams{replacements: []replacement{{"a", "b"}}, template: "t.tmpl"},
+			wantErr: "--replace-body can't be combined with --body or --template",
 		},
 		{name: "prepend alone", params: &editParams{prependBody: "x", prependBodySet: true}},
 		{
@@ -98,6 +110,14 @@ func TestQuestionsSkipDescriptionEditorWhenExtending(t *testing.T) {
 	qs = ec.questions(&jira.Issue{}, "")
 	require.Len(t, qs, 1)
 	assert.Equal(t, "summary", qs[0].Name)
+
+	ec = editCmd{params: &editParams{summary: "kept", replacements: []replacement{{"a", "b"}}}}
+	assert.Empty(t, ec.questions(&jira.Issue{}, ""))
+
+	ec = editCmd{params: &editParams{replacements: []replacement{{"a", "b"}}}}
+	qs = ec.questions(&jira.Issue{}, "")
+	require.Len(t, qs, 1)
+	assert.Equal(t, "summary", qs[0].Name)
 }
 
 // Agents often run with a non-TTY stdin, and reading it would replace the
@@ -115,6 +135,7 @@ func TestShouldReadBodyFromStdin(t *testing.T) {
 		{name: "template given", params: &editParams{template: "t"}, stdin: true, want: false},
 		{name: "append body given", params: &editParams{appendBody: "a"}, stdin: true, want: false},
 		{name: "prepend body given", params: &editParams{prependBody: "p"}, stdin: true, want: false},
+		{name: "replace body given", params: &editParams{replacements: []replacement{{"a", "b"}}}, stdin: true, want: false},
 	}
 
 	for _, tc := range tests {
@@ -124,7 +145,7 @@ func TestShouldReadBodyFromStdin(t *testing.T) {
 	}
 }
 
-func TestOnlyAddingToDescription(t *testing.T) {
+func TestOnlyChangingDescription(t *testing.T) {
 	tests := []struct {
 		name   string
 		params *editParams
@@ -134,6 +155,8 @@ func TestOnlyAddingToDescription(t *testing.T) {
 		{name: "append and assignee", params: &editParams{appendBody: "a", assignee: "me"}, want: true},
 		{name: "append and notify flag", params: &editParams{appendBody: "a", skipNotify: true}, want: true},
 		{name: "prepend alone", params: &editParams{prependBody: "p"}, want: true},
+		{name: "replace alone", params: &editParams{replacements: []replacement{{"a", "b"}}}, want: true},
+		{name: "replace and summary", params: &editParams{replacements: []replacement{{"a", "b"}}, summary: "s"}, want: false},
 		{name: "prepend and append", params: &editParams{prependBody: "p", appendBody: "a"}, want: true},
 		{name: "prepend and summary", params: &editParams{prependBody: "p", summary: "s"}, want: false},
 		{name: "nothing to add", params: &editParams{}, want: false},
@@ -151,7 +174,7 @@ func TestOnlyAddingToDescription(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, onlyAddingToDescription(tc.params))
+			assert.Equal(t, tc.want, onlyChangingDescription(tc.params))
 		})
 	}
 }
@@ -254,6 +277,39 @@ func descriptionServer(t *testing.T, getPath, description string) (*httptest.Ser
 	return srv, written
 }
 
+func extendDescription(client *jira.Client, change descriptionChange, local, skipNotify bool) error {
+	write, err := changeDescription(client, "TEST-1", change, local)
+	if err != nil {
+		return err
+	}
+	return write(skipNotify)
+}
+
+func TestChangeDescriptionWritesOnlyWhenAsked(t *testing.T) {
+	tests := []struct {
+		name, installation, path, description string
+	}{
+		{"cloud", jira.InstallationTypeCloud, "/rest/api/3/issue/TEST-1", cloudDoc(cloudParagraph("old"))},
+		{"server", jira.InstallationTypeLocal, "/rest/api/2/issue/TEST-1", `"old"`},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv, written := descriptionServer(t, tc.path, tc.description)
+			client := jira.NewClient(jira.Config{Server: srv.URL, Installation: tc.installation})
+
+			change := descriptionChange{replacements: []replacement{{"old", "new"}}}
+			write, err := changeDescription(client, "TEST-1", change, tc.installation == jira.InstallationTypeLocal)
+			require.NoError(t, err)
+			assert.Zero(t, written.puts, "the description may only be written by the returned function")
+
+			require.NoError(t, write(true))
+			assert.Equal(t, 1, written.puts)
+			assert.Equal(t, "notifyUsers=false", written.query)
+		})
+	}
+}
+
 func TestExtendDescriptionAppendCloud(t *testing.T) {
 	const existing = `{"version":1,"type":"doc","content":[` +
 		`{"type":"panel","attrs":{"panelType":"info"},"content":[` +
@@ -266,7 +322,7 @@ func TestExtendDescriptionAppendCloud(t *testing.T) {
 	srv, written := descriptionServer(t, "/rest/api/3/issue/TEST-1", existing)
 	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeCloud})
 
-	err := extendDescription(client, "TEST-1", "", "- second\n\nafter", false, true)
+	err := extendDescription(client, descriptionChange{appendMd: "- second\n\nafter"}, false, true)
 	require.NoError(t, err)
 
 	assert.Equal(t, http.MethodPut, written.method)
@@ -287,7 +343,7 @@ func TestExtendDescriptionAppendCloudEmptyDescription(t *testing.T) {
 	srv, written := descriptionServer(t, "/rest/api/3/issue/TEST-1", "null")
 	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeCloud})
 
-	require.NoError(t, extendDescription(client, "TEST-1", "", "hello", false, false))
+	require.NoError(t, extendDescription(client, descriptionChange{appendMd: "hello"}, false, false))
 
 	assert.Empty(t, written.query)
 	assert.JSONEq(t, `{"fields":{"description":{"version":1,"type":"doc","content":[`+
@@ -298,7 +354,7 @@ func TestExtendDescriptionAppendCloudKeepsDescriptionThatIsNotADF(t *testing.T) 
 	srv, written := descriptionServer(t, "/rest/api/3/issue/TEST-1", `"plain string"`)
 	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeCloud})
 
-	assert.Error(t, extendDescription(client, "TEST-1", "", "hello", false, false))
+	assert.Error(t, extendDescription(client, descriptionChange{appendMd: "hello"}, false, false))
 	assert.Empty(t, written.method, "nothing may be written")
 }
 
@@ -306,7 +362,7 @@ func TestExtendDescriptionAppendServer(t *testing.T) {
 	srv, written := descriptionServer(t, "/rest/api/2/issue/TEST-1", `"h1. Title\n* a\n* b"`)
 	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeLocal})
 
-	require.NoError(t, extendDescription(client, "TEST-1", "", "- c\n\nafter", true, true))
+	require.NoError(t, extendDescription(client, descriptionChange{appendMd: "- c\n\nafter"}, true, true))
 
 	assert.Equal(t, http.MethodPut, written.method)
 	assert.Equal(t, "/rest/api/2/issue/TEST-1", written.path)
@@ -318,7 +374,7 @@ func TestExtendDescriptionAppendServerEmptyDescription(t *testing.T) {
 	srv, written := descriptionServer(t, "/rest/api/2/issue/TEST-1", "null")
 	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeLocal})
 
-	require.NoError(t, extendDescription(client, "TEST-1", "", "hello", true, false))
+	require.NoError(t, extendDescription(client, descriptionChange{appendMd: "hello"}, true, false))
 
 	assert.JSONEq(t, `{"fields":{"description":"hello"}}`, written.body)
 }
@@ -331,7 +387,7 @@ func TestExtendDescriptionCloudPrependKeepsMedia(t *testing.T) {
 	srv, written := descriptionServer(t, "/rest/api/3/issue/TEST-1", `{"version":1,"type":"doc","content":[`+media+`,`+old+`]}`)
 	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeCloud})
 
-	require.NoError(t, extendDescription(client, "TEST-1", "## Status\n\nnew", "", false, false))
+	require.NoError(t, extendDescription(client, descriptionChange{prepend: "## Status\n\nnew"}, false, false))
 
 	assert.Equal(t, 1, written.puts)
 	assert.Equal(t, http.MethodPut, written.method)
@@ -348,7 +404,7 @@ func TestExtendDescriptionCloudPrependAndAppend(t *testing.T) {
 		`{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"existing"}]}]}`)
 	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeCloud})
 
-	require.NoError(t, extendDescription(client, "TEST-1", "top", "bottom", false, true))
+	require.NoError(t, extendDescription(client, descriptionChange{prepend: "top", appendMd: "bottom"}, false, true))
 
 	assert.Equal(t, 1, written.puts)
 	assert.Equal(t, "notifyUsers=false", written.query)
@@ -362,7 +418,7 @@ func TestExtendDescriptionCloudPrependEmptyDescription(t *testing.T) {
 	srv, written := descriptionServer(t, "/rest/api/3/issue/TEST-1", "null")
 	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeCloud})
 
-	require.NoError(t, extendDescription(client, "TEST-1", "hello", "", false, false))
+	require.NoError(t, extendDescription(client, descriptionChange{prepend: "hello"}, false, false))
 
 	assert.JSONEq(t, `{"fields":{"description":{"version":1,"type":"doc","content":[`+
 		`{"type":"paragraph","content":[{"type":"text","text":"hello"}]}]}}}`, written.body)
@@ -372,7 +428,7 @@ func TestExtendDescriptionCloudPrependKeepsDescriptionThatIsNotADF(t *testing.T)
 	srv, written := descriptionServer(t, "/rest/api/3/issue/TEST-1", `"plain string"`)
 	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeCloud})
 
-	assert.Error(t, extendDescription(client, "TEST-1", "hello", "", false, false))
+	assert.Error(t, extendDescription(client, descriptionChange{prepend: "hello"}, false, false))
 	assert.Zero(t, written.puts, "nothing may be written")
 }
 
@@ -380,7 +436,7 @@ func TestExtendDescriptionServerPrepend(t *testing.T) {
 	srv, written := descriptionServer(t, "/rest/api/2/issue/TEST-1", `"* a\n* b\n\nafter"`)
 	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeLocal})
 
-	require.NoError(t, extendDescription(client, "TEST-1", "- z", "", true, false))
+	require.NoError(t, extendDescription(client, descriptionChange{prepend: "- z"}, true, false))
 
 	assert.Equal(t, http.MethodPut, written.method)
 	assert.Equal(t, "/rest/api/2/issue/TEST-1", written.path)
@@ -391,9 +447,144 @@ func TestExtendDescriptionServerPrependAndAppend(t *testing.T) {
 	srv, written := descriptionServer(t, "/rest/api/2/issue/TEST-1", `"!diagram.png!\nmiddle"`)
 	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeLocal})
 
-	require.NoError(t, extendDescription(client, "TEST-1", "top", "bottom", true, true))
+	require.NoError(t, extendDescription(client, descriptionChange{prepend: "top", appendMd: "bottom"}, true, true))
 
 	assert.Equal(t, 1, written.puts)
 	assert.Equal(t, "notifyUsers=false", written.query)
 	assert.JSONEq(t, `{"fields":{"description":"top\n\n!diagram.png!\nmiddle\n\nbottom"}}`, written.body)
+}
+
+func TestParseReplacements(t *testing.T) {
+	got, err := parseReplacements([]string{"Friday:Monday", "see:https://example.com:8080", "(draft) :"})
+	require.NoError(t, err)
+	assert.Equal(t, []replacement{
+		{"Friday", "Monday"},
+		{"see", "https://example.com:8080"},
+		{"(draft) ", ""},
+	}, got)
+
+	got, err = parseReplacements(nil)
+	require.NoError(t, err)
+	assert.Empty(t, got)
+
+	_, err = parseReplacements([]string{"a:b", "no separator"})
+	assert.EqualError(t, err, `invalid --replace-body "no separator": must be in format <search>:<replace>`)
+
+	_, err = parseReplacements([]string{":b"})
+	assert.EqualError(t, err, `invalid --replace-body ":b": search string cannot be empty`)
+}
+
+const (
+	cloudMedia = `{"type":"mediaSingle","attrs":{"layout":"center","width":50},"content":[` +
+		`{"type":"media","attrs":{"id":"d3a1a2f4-0000-4000-8000-000000000001","type":"file","collection":"","width":800,"height":600}}]}`
+	cloudCard = `{"type":"inlineCard","attrs":{"url":"https://example.atlassian.net/browse/TEST-2"}}`
+)
+
+func cloudDoc(nodes ...string) string {
+	return `{"version":1,"type":"doc","content":[` + strings.Join(nodes, ",") + `]}`
+}
+
+func cloudParagraph(text string) string {
+	return `{"type":"paragraph","content":[{"type":"text","text":"` + text + `"}]}`
+}
+
+func TestExtendDescriptionCloudReplaceKeepsMediaAndSmartLinks(t *testing.T) {
+	paragraph := func(tail string) string {
+		return `{"type":"paragraph","content":[{"type":"text","text":"Ship on "},` + cloudCard +
+			`,{"type":"text","text":"` + tail + `","marks":[{"type":"em"}]}]}`
+	}
+	srv, written := descriptionServer(t, "/rest/api/3/issue/TEST-1", cloudDoc(cloudMedia, paragraph(" on Friday")))
+	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeCloud})
+
+	change := descriptionChange{replacements: []replacement{{"Friday", "Monday"}}}
+	require.NoError(t, extendDescription(client, change, false, false))
+
+	assert.Equal(t, 1, written.puts)
+	assert.Equal(t, http.MethodPut, written.method)
+	assert.Equal(t, "/rest/api/3/issue/TEST-1", written.path)
+	assert.JSONEq(t, `{"fields":{"description":`+cloudDoc(cloudMedia, paragraph(" on Monday"))+`}}`, written.body)
+}
+
+func TestExtendDescriptionCloudReplaceNotFoundWritesNothing(t *testing.T) {
+	srv, written := descriptionServer(t, "/rest/api/3/issue/TEST-1", cloudDoc(cloudParagraph("hello")))
+	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeCloud})
+
+	change := descriptionChange{replacements: []replacement{{"hello", "hi"}, {"missing", "x"}}, appendMd: "more"}
+	err := extendDescription(client, change, false, false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `"missing" not found in the description of TEST-1`)
+	assert.Contains(t, err.Error(), "separate pieces")
+	assert.Empty(t, written.method, "nothing may be written")
+}
+
+func TestExtendDescriptionCloudReplaceEmptyDescription(t *testing.T) {
+	srv, written := descriptionServer(t, "/rest/api/3/issue/TEST-1", "null")
+	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeCloud})
+
+	change := descriptionChange{replacements: []replacement{{"a", "b"}}}
+	err := extendDescription(client, change, false, false)
+
+	assert.EqualError(t, err, `"a" not found in the description of TEST-1, which is empty`)
+	assert.Empty(t, written.method, "nothing may be written")
+}
+
+func TestExtendDescriptionCloudReplaceThenPrependAndAppend(t *testing.T) {
+	srv, written := descriptionServer(t, "/rest/api/3/issue/TEST-1", cloudDoc(cloudParagraph("old")))
+	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeCloud})
+
+	change := descriptionChange{replacements: []replacement{{"old", "new"}}, prepend: "old top", appendMd: "old bottom"}
+	require.NoError(t, extendDescription(client, change, false, false))
+
+	assert.Equal(t, 1, written.puts)
+	assert.JSONEq(t, `{"fields":{"description":`+
+		cloudDoc(cloudParagraph("old top"), cloudParagraph("new"), cloudParagraph("old bottom"))+`}}`, written.body)
+}
+
+func TestExtendDescriptionCloudReplaceSequential(t *testing.T) {
+	t.Run("later pairs see earlier results", func(t *testing.T) {
+		srv, written := descriptionServer(t, "/rest/api/3/issue/TEST-1", cloudDoc(cloudParagraph("a")))
+		client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeCloud})
+
+		change := descriptionChange{replacements: []replacement{{"a", "b"}, {"b", "c"}}}
+		require.NoError(t, extendDescription(client, change, false, false))
+
+		assert.JSONEq(t, `{"fields":{"description":`+cloudDoc(cloudParagraph("c"))+`}}`, written.body)
+	})
+
+	t.Run("a later pair that matches nothing fails", func(t *testing.T) {
+		srv, written := descriptionServer(t, "/rest/api/3/issue/TEST-1", cloudDoc(cloudParagraph("a")))
+		client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeCloud})
+
+		change := descriptionChange{replacements: []replacement{{"a", "b"}, {"a", "c"}}}
+		err := extendDescription(client, change, false, false)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `"a" not found`)
+		assert.Empty(t, written.method, "nothing may be written")
+	})
+}
+
+func TestExtendDescriptionServerReplace(t *testing.T) {
+	srv, written := descriptionServer(t, "/rest/api/2/issue/TEST-1", `"h1. Title\nSee *Friday*"`)
+	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeLocal})
+
+	change := descriptionChange{replacements: []replacement{{"Friday", "Monday"}}}
+	require.NoError(t, extendDescription(client, change, true, true))
+
+	assert.Equal(t, http.MethodPut, written.method)
+	assert.Equal(t, "/rest/api/2/issue/TEST-1", written.path)
+	assert.Equal(t, "notifyUsers=false", written.query)
+	assert.JSONEq(t, `{"fields":{"description":"h1. Title\nSee *Monday*"}}`, written.body)
+}
+
+func TestExtendDescriptionServerReplaceNotFoundWritesNothing(t *testing.T) {
+	srv, written := descriptionServer(t, "/rest/api/2/issue/TEST-1", `"h1. Title"`)
+	client := jira.NewClient(jira.Config{Server: srv.URL, Installation: jira.InstallationTypeLocal})
+
+	change := descriptionChange{replacements: []replacement{{"Friday", "Monday"}}}
+	err := extendDescription(client, change, true, false)
+
+	assert.EqualError(t, err, `"Friday" not found in the description of TEST-1`)
+	assert.Empty(t, written.method, "nothing may be written")
 }

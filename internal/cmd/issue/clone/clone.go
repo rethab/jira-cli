@@ -1,7 +1,6 @@
 package clone
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -10,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/rethab/jira-cli/api"
+	"github.com/rethab/jira-cli/internal/cmdcommon"
 	"github.com/rethab/jira-cli/internal/cmdutil"
 	"github.com/rethab/jira-cli/internal/query"
 	"github.com/rethab/jira-cli/pkg/adf"
@@ -213,7 +213,7 @@ func (cc *cloneCmd) getActualCreateParams(project string, issue *jira.Issue) *cr
 
 	if len(cc.params.replace) > 0 {
 		for _, r := range cc.params.replace {
-			from, to, err := parseReplace(r)
+			from, to, err := cmdcommon.ParseReplace(r)
 			if err != nil {
 				fmt.Println()
 				cmdutil.Fail("Invalid replace string %q: %s. Skipping replacement...", r, err)
@@ -231,21 +231,6 @@ func (cc *cloneCmd) getActualCreateParams(project string, issue *jira.Issue) *cr
 	cp.body = body
 
 	return &cp
-}
-
-// parseReplace parses a replace flag value in the format <search>:<replace>.
-// The value is split on the first colon only, so the replacement may contain
-// colons (eg: URLs) but the search string may not. An empty search string is
-// rejected as it would match between every character.
-func parseReplace(r string) (string, string, error) {
-	from, to, found := strings.Cut(r, ":")
-	if !found {
-		return "", "", errors.New("must be in format <search>:<replace>")
-	}
-	if from == "" {
-		return "", "", errors.New("search string cannot be empty")
-	}
-	return from, to, nil
 }
 
 type cloneParams struct {

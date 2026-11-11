@@ -84,21 +84,45 @@ type ADF struct {
 // ReplaceAll replaces all occurrences of an old string
 // in a text node with a new one.
 func (a *ADF) ReplaceAll(old, new string) {
-	if a == nil || len(a.Content) == 0 {
-		return
-	}
-	for _, parent := range a.Content {
-		a.replace(parent, old, new)
-	}
+	_ = a.ReplaceText(old, new)
 }
 
-func (a *ADF) replace(n *Node, old, new string) {
-	for _, child := range n.Content {
-		a.replace(child, old, new)
+// ReplaceText replaces every occurrence of old with new inside the text nodes
+// of the document, at any depth, and returns how many it replaced. Formatted
+// text is stored as separate text nodes, so a match never spans two of them.
+// Marks, attributes and all other nodes are left alone. Jira rejects a text
+// node without text, so a node that the replacement empties is removed.
+func (a *ADF) ReplaceText(old, new string) int {
+	if a == nil || old == "" {
+		return 0
 	}
-	if n.NodeType == ChildNodeText {
-		n.Text = strings.ReplaceAll(n.Text, old, new)
+	count := 0
+	a.Content = replaceInNodes(a.Content, old, new, &count)
+	return count
+}
+
+func replaceInNodes(nodes []*Node, old, new string, count *int) []*Node {
+	if len(nodes) == 0 {
+		return nodes
 	}
+	kept := nodes[:0]
+	for _, n := range nodes {
+		if n.NodeType == ChildNodeText {
+			if c := strings.Count(n.Text, old); c > 0 {
+				*count += c
+				n.Text = strings.ReplaceAll(n.Text, old, new)
+				if n.Text == "" {
+					continue
+				}
+			}
+		} else {
+			n.Content = replaceInNodes(n.Content, old, new, count)
+		}
+		kept = append(kept, n)
+	}
+	// Stale pointers past the new length would keep removed nodes alive.
+	clear(nodes[len(kept):])
+	return kept
 }
 
 // HasMedia reports whether the document embeds any media (inline images or

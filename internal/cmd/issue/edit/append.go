@@ -2,9 +2,11 @@ package edit
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 
+	"github.com/rethab/jira-cli/internal/cmdcommon"
 	"github.com/rethab/jira-cli/pkg/jira"
 )
 
@@ -14,6 +16,9 @@ var (
 )
 
 func checkDescriptionAdditions(params *editParams) error {
+	if len(params.replacements) > 0 && (params.body != "" || params.template != "") {
+		return errors.New("--replace-body can't be combined with --body or --template")
+	}
 	if err := checkAddition("--append-body", params.appendBody, params.appendBodySet, params); err != nil {
 		return err
 	}
@@ -33,19 +38,19 @@ func checkAddition(flag, value string, set bool, params *editParams) error {
 	return nil
 }
 
-// Adding to the description must never fall back to stdin: a non-TTY stdin is
-// common in scripts and agents, and its content would replace the description
-// instead.
+// Changing the description in place must never fall back to stdin: a non-TTY
+// stdin is common in scripts and agents, and its content would replace the
+// description instead.
 func shouldReadBodyFromStdin(params *editParams, stdinHasData bool) bool {
 	return params.body == "" && params.template == "" &&
-		params.appendBody == "" && params.prependBody == "" && stdinHasData
+		params.appendBody == "" && params.prependBody == "" && len(params.replacements) == 0 && stdinHasData
 }
 
 // The description write is a request of its own, so an edit request with nothing
 // else in it would be a second, empty update that Jira can still announce to
 // watchers. The assignee is set by a separate request and doesn't count.
-func onlyAddingToDescription(params *editParams) bool {
-	return (params.appendBody != "" || params.prependBody != "") &&
+func onlyChangingDescription(params *editParams) bool {
+	return (params.appendBody != "" || params.prependBody != "" || len(params.replacements) > 0) &&
 		params.summary == "" && params.body == "" && params.issueType == "" &&
 		params.parentIssueKey == "" && params.priority == "" && params.originalEstimate == "" &&
 		len(params.labels) == 0 && len(params.components) == 0 &&
@@ -53,35 +58,81 @@ func onlyAddingToDescription(params *editParams) bool {
 		len(params.customFields) == 0
 }
 
+// replacement is one <search>:<replace> pair of --replace-body.
+type replacement struct {
+	from, to string
+}
+
+func parseReplacements(values []string) ([]replacement, error) {
+	var out []replacement
+	for _, v := range values {
+		from, to, err := cmdcommon.ParseReplace(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid --replace-body %q: %w", v, err)
+		}
+		out = append(out, replacement{from, to})
+	}
+	return out, nil
+}
+
+// descriptionChange is what is done to the existing description. Replacements
+// are applied before prepend and append, so that text added in the same command
+// is never rewritten.
+type descriptionChange struct {
+	replacements []replacement
+	prepend      string
+	appendMd     string
+}
+
 // Cloud keeps the description as ADF and Server as wiki markup, so each is
-// extended in its own format; converting the existing content would change it.
-// Both ends are applied to a single read so that they land in one update.
-func extendDescription(client *jira.Client, key, prepend, appendMd string, local, skipNotify bool) error {
+// changed in its own format; converting the existing content would change it.
+// Everything is applied to a single read so that it lands in one update. The
+// write is returned instead of made, so that a search that matches nothing can
+// fail before any other field of the issue is saved.
+func changeDescription(client *jira.Client, key string, change descriptionChange, local bool) (func(skipNotify bool) error, error) {
 	if local {
 		wiki, err := client.GetIssueDescriptionV2(key)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if prepend != "" {
-			wiki = prependWiki(wiki, client.ToJiraMD(prepend))
+		for _, r := range change.replacements {
+			if !strings.Contains(wiki, r.from) {
+				return nil, fmt.Errorf("%q not found in the description of %s", r.from, key)
+			}
+			wiki = strings.ReplaceAll(wiki, r.from, r.to)
 		}
-		if appendMd != "" {
-			wiki = appendWiki(wiki, client.ToJiraMD(appendMd))
+		if change.prepend != "" {
+			wiki = prependWiki(wiki, client.ToJiraMD(change.prepend))
 		}
-		return client.SetIssueDescriptionV2(key, wiki, skipNotify)
+		if change.appendMd != "" {
+			wiki = appendWiki(wiki, client.ToJiraMD(change.appendMd))
+		}
+		return func(skipNotify bool) error { return client.SetIssueDescriptionV2(key, wiki, skipNotify) }, nil
 	}
 
 	doc, err := client.GetIssueDescription(key)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if prepend != "" {
-		doc = doc.Prepend(client.ToADF(prepend))
+	for _, r := range change.replacements {
+		if doc == nil {
+			return nil, fmt.Errorf("%q not found in the description of %s, which is empty", r.from, key)
+		}
+		if doc.ReplaceText(r.from, r.to) == 0 {
+			return nil, fmt.Errorf(
+				"%q not found in the description of %s; text that spans formatting, links, mentions or smart links "+
+					"is stored in separate pieces, so search for a part without them",
+				r.from, key,
+			)
+		}
 	}
-	if appendMd != "" {
-		doc = doc.Append(client.ToADF(appendMd))
+	if change.prepend != "" {
+		doc = doc.Prepend(client.ToADF(change.prepend))
 	}
-	return client.SetIssueDescription(key, doc, skipNotify)
+	if change.appendMd != "" {
+		doc = doc.Append(client.ToADF(change.appendMd))
+	}
+	return func(skipNotify bool) error { return client.SetIssueDescription(key, doc, skipNotify) }, nil
 }
 
 type wikiLineKind int

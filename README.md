@@ -59,8 +59,8 @@ PR asking for it.
 **New flags**
 
 - `jira issue edit --type`: change the issue type in place.
-- `jira issue edit --original-estimate` [#801], `--template`, and `--append-body`/`--prepend-body` (add to the end
-  or start of the description without rewriting it).
+- `jira issue edit --original-estimate` [#801], `--template`, `--append-body`/`--prepend-body` (add to the end
+  or start of the description without rewriting it), and `--replace-body` (change text in place).
 - `jira issue transitions --fields`: list the fields each transition's screen asks for.
 - `jira issue move --path [--yes]`: find and take the transitions to a status several steps away.
 - `jira issue view --description`: print only the summary and description. [#933]
@@ -537,6 +537,10 @@ $ jira issue edit ISSUE-1 --append-body "- Runbook: https://example.com/runbook"
 # Insert at the start of the description; images and other content below stay as they are
 $ jira issue edit ISSUE-1 --prepend-body "**Update:** fixed in v2.0" --no-input
 
+# Replace text in the description; images, smart links and other content stay as they are
+# Repeat the flag to make several replacements in one update, and leave the replacement empty to delete text
+$ jira issue edit ISSUE-1 --replace-body "deploy on Friday:deploy on Monday" --replace-body "(draft) :" --no-input
+
 # In the interactive prompt, "OriginalEstimate" can be picked under "What would you like to add?"
 
 # Set custom fields, by name or by id; cascading selects take "Parent->Child"
@@ -555,6 +559,14 @@ is, including images, smart links and mentions, so `--allow-image-loss` isn't ne
 `--body` or `--template`, and mentions work as in `--body`. Used on its own, it updates only the description, so
 watchers are notified once. `--prepend-body` does the same at the start of the description, and a list it ends with
 joins a list the description starts with. The two flags can be combined in one update.
+
+`--replace-body "<search>:<replace>"` replaces every occurrence of the search text in the existing description and
+leaves everything else, including images, smart links and mentions, as it is. It can be repeated (applied in order)
+and combined with `--append-body`/`--prepend-body`, but not with `--body` or `--template`. The search is split off at
+the first colon, so it can't contain one. On Jira Cloud the replacement is plain text and takes the formatting of the
+text it replaces, and a match must lie within text of one formatting: text that spans bold, a link, a mention or a
+smart link isn't found. On Jira Server the search and the replacement are wiki markup. If a search text isn't found,
+nothing is changed, not even the other fields given in the same command.
 
 #### Assign
 The `assign` command lets you assign a user to an issue.

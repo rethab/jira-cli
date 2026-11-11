@@ -1,4 +1,4 @@
-package clone
+package cmdcommon
 
 import (
 	"testing"
@@ -61,7 +61,7 @@ func TestParseReplace(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			from, to, err := parseReplace(tc.input)
+			from, to, err := ParseReplace(tc.input)
 			if tc.wantErr {
 				assert.Error(t, err)
 				return
