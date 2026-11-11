@@ -51,6 +51,9 @@ $ jira issue edit ISSUE-1 --append-body "- Runbook: https://example.com/runbook"
 # Insert at the start of the description; images and other content below stay as they are
 $ jira issue edit ISSUE-1 --prepend-body "**Update:** fixed in v2.0" --no-input
 
+# Replace text in the description; images, smart links and other content stay as they are
+$ jira issue edit ISSUE-1 --replace-body "Friday:Monday" --no-input
+
 # Use pipe to read the description body directly from standard input
 $ echo "Description from stdin" | jira issue edit ISSUE-1 -s"New updated summary"  --no-input
 
@@ -146,7 +149,7 @@ func edit(cmd *cobra.Command, args []string) {
 	params.appendBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.appendBody, params.noInput)
 	params.prependBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.prependBody, params.noInput)
 
-	descriptionOnly := onlyAddingToDescription(params)
+	descriptionOnly := onlyChangingDescription(params)
 	if !descriptionOnly {
 		edr := buildEditRequest(client, project, issue, params)
 		edr.WithCustomFields(customFields)
@@ -164,13 +167,18 @@ func edit(cmd *cobra.Command, args []string) {
 		cmdutil.ExitIfError(err)
 	}
 
-	if params.prependBody != "" || params.appendBody != "" {
+	if params.prependBody != "" || params.appendBody != "" || len(params.replacements) > 0 {
 		local := viper.GetString("installation") == jira.InstallationTypeLocal
 		err := func() error {
 			s := cmdutil.Info("Updating the description...")
 			defer s.Stop()
 
-			return extendDescription(client, params.issueKey, params.prependBody, params.appendBody, local, params.skipNotify)
+			change := descriptionChange{
+				replacements: params.replacements,
+				prepend:      params.prependBody,
+				appendMd:     params.appendBody,
+			}
+			return extendDescription(client, params.issueKey, change, local, params.skipNotify)
 		}()
 		if err != nil && descriptionOnly {
 			cmdutil.Failed("Updating the description failed: %s", err)
@@ -402,7 +410,7 @@ func (ec *editCmd) questions(issue *jira.Issue, originalBody string) []*survey.Q
 		})
 	}
 
-	if ec.params.body != "" || ec.params.appendBody != "" || ec.params.prependBody != "" {
+	if ec.params.body != "" || ec.params.appendBody != "" || ec.params.prependBody != "" || len(ec.params.replacements) > 0 {
 		return qs
 	}
 	// Any change made in the editor would be refused by checkImageLoss, discarding
@@ -444,6 +452,7 @@ type editParams struct {
 	appendBodySet    bool
 	prependBody      string
 	prependBodySet   bool
+	replacements     []replacement
 	priority         string
 	assignee         string
 	labels           []string
@@ -492,6 +501,12 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 	cmdutil.ExitIfError(err)
 
 	prependBody, err := flags.GetString("prepend-body")
+	cmdutil.ExitIfError(err)
+
+	replaceBody, err := flags.GetStringArray("replace-body")
+	cmdutil.ExitIfError(err)
+
+	replacements, err := parseReplacements(replaceBody)
 	cmdutil.ExitIfError(err)
 
 	priority, err := flags.GetString("priority")
@@ -544,6 +559,7 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 		template:         template,
 		appendBody:       appendBody,
 		prependBody:      prependBody,
+		replacements:     replacements,
 		priority:         priority,
 		assignee:         assignee,
 		labels:           labels,
@@ -641,6 +657,8 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("template", "T", "", "Path to a file to read the description from, or - for standard input")
 	cmd.Flags().String("append-body", "", "Append Markdown to the end of the description, leaving the existing content untouched")
 	cmd.Flags().String("prepend-body", "", "Insert Markdown at the start of the description, leaving the existing content untouched")
+	cmd.Flags().StringArray("replace-body", []string{}, "Replace text in the description, leaving everything else untouched. "+
+		"Format <search>:<replace>, split on the first colon; repeatable")
 	cmd.Flags().StringP("priority", "y", "", "Edit priority")
 	cmd.Flags().StringP("assignee", "a", "", "Edit assignee (email or display name)")
 	cmd.Flags().StringArrayP("label", "l", []string{}, "Append labels")
