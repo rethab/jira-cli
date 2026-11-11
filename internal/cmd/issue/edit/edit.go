@@ -149,6 +149,22 @@ func edit(cmd *cobra.Command, args []string) {
 	params.appendBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.appendBody, params.noInput)
 	params.prependBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.prependBody, params.noInput)
 
+	var writeDescription func(skipNotify bool) error
+	if params.prependBody != "" || params.appendBody != "" || len(params.replacements) > 0 {
+		local := viper.GetString("installation") == jira.InstallationTypeLocal
+		change := descriptionChange{
+			replacements: params.replacements,
+			prepend:      params.prependBody,
+			appendMd:     params.appendBody,
+		}
+		s := cmdutil.Info("Fetching the description...")
+		writeDescription, err = changeDescription(client, params.issueKey, change, local)
+		s.Stop()
+		if err != nil {
+			cmdutil.Failed("Nothing was updated: %s", err)
+		}
+	}
+
 	descriptionOnly := onlyChangingDescription(params)
 	if !descriptionOnly {
 		edr := buildEditRequest(client, project, issue, params)
@@ -167,18 +183,12 @@ func edit(cmd *cobra.Command, args []string) {
 		cmdutil.ExitIfError(err)
 	}
 
-	if params.prependBody != "" || params.appendBody != "" || len(params.replacements) > 0 {
-		local := viper.GetString("installation") == jira.InstallationTypeLocal
+	if writeDescription != nil {
 		err := func() error {
 			s := cmdutil.Info("Updating the description...")
 			defer s.Stop()
 
-			change := descriptionChange{
-				replacements: params.replacements,
-				prepend:      params.prependBody,
-				appendMd:     params.appendBody,
-			}
-			return extendDescription(client, params.issueKey, change, local, params.skipNotify)
+			return writeDescription(params.skipNotify)
 		}()
 		if err != nil && descriptionOnly {
 			cmdutil.Failed("Updating the description failed: %s", err)

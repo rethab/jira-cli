@@ -563,10 +563,10 @@ joins a list the description starts with. The two flags can be combined in one u
 `--replace-body "<search>:<replace>"` replaces every occurrence of the search text in the existing description and
 leaves everything else, including images, smart links and mentions, as it is. It can be repeated (applied in order)
 and combined with `--append-body`/`--prepend-body`, but not with `--body` or `--template`. The search is split off at
-the first colon, so it can't contain one. The replacement is plain text and takes the formatting of the text it
-replaces. On Jira Cloud a match must lie within text of one formatting: text that spans bold, a link, a mention or a
-smart link isn't found. On Jira Server the search matches the wiki markup. If a search text isn't found, nothing is
-changed.
+the first colon, so it can't contain one. On Jira Cloud the replacement is plain text and takes the formatting of the
+text it replaces, and a match must lie within text of one formatting: text that spans bold, a link, a mention or a
+smart link isn't found. On Jira Server the search and the replacement are wiki markup. If a search text isn't found,
+nothing is changed, not even the other fields given in the same command.
 
 #### Assign
 The `assign` command lets you assign a user to an issue.

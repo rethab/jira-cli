@@ -86,17 +86,18 @@ type descriptionChange struct {
 
 // Cloud keeps the description as ADF and Server as wiki markup, so each is
 // changed in its own format; converting the existing content would change it.
-// Everything is applied to a single read so that it lands in one update, and a
-// search that matches nothing fails before anything is written.
-func extendDescription(client *jira.Client, key string, change descriptionChange, local, skipNotify bool) error {
+// Everything is applied to a single read so that it lands in one update. The
+// write is returned instead of made, so that a search that matches nothing can
+// fail before any other field of the issue is saved.
+func changeDescription(client *jira.Client, key string, change descriptionChange, local bool) (func(skipNotify bool) error, error) {
 	if local {
 		wiki, err := client.GetIssueDescriptionV2(key)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, r := range change.replacements {
 			if !strings.Contains(wiki, r.from) {
-				return fmt.Errorf("%q not found in the description of %s", r.from, key)
+				return nil, fmt.Errorf("%q not found in the description of %s", r.from, key)
 			}
 			wiki = strings.ReplaceAll(wiki, r.from, r.to)
 		}
@@ -106,16 +107,19 @@ func extendDescription(client *jira.Client, key string, change descriptionChange
 		if change.appendMd != "" {
 			wiki = appendWiki(wiki, client.ToJiraMD(change.appendMd))
 		}
-		return client.SetIssueDescriptionV2(key, wiki, skipNotify)
+		return func(skipNotify bool) error { return client.SetIssueDescriptionV2(key, wiki, skipNotify) }, nil
 	}
 
 	doc, err := client.GetIssueDescription(key)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, r := range change.replacements {
+		if doc == nil {
+			return nil, fmt.Errorf("%q not found in the description of %s, which is empty", r.from, key)
+		}
 		if doc.ReplaceText(r.from, r.to) == 0 {
-			return fmt.Errorf(
+			return nil, fmt.Errorf(
 				"%q not found in the description of %s; text that spans formatting, links, mentions or smart links "+
 					"is stored in separate pieces, so search for a part without them",
 				r.from, key,
@@ -128,7 +132,7 @@ func extendDescription(client *jira.Client, key string, change descriptionChange
 	if change.appendMd != "" {
 		doc = doc.Append(client.ToADF(change.appendMd))
 	}
-	return client.SetIssueDescription(key, doc, skipNotify)
+	return func(skipNotify bool) error { return client.SetIssueDescription(key, doc, skipNotify) }, nil
 }
 
 type wikiLineKind int
