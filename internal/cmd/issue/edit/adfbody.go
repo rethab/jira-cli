@@ -40,7 +40,9 @@ func loadADFBody(params *editParams) error {
 // document. The returned bytes are what gets sent: adf.ADF models only part of
 // what Jira accepts, so writing it back out would silently drop the rest.
 func parseADFBody(b []byte) (json.RawMessage, *adf.ADF, error) {
-	b = bytes.TrimSpace(b)
+	// Some Windows editors and PowerShell redirection write a byte order mark, which
+	// json.Valid rejects.
+	b = bytes.TrimSpace(bytes.TrimPrefix(b, []byte("\xef\xbb\xbf")))
 	if len(b) == 0 {
 		return nil, nil, errors.New("--adf-body is empty")
 	}

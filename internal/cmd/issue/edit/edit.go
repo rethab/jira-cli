@@ -95,6 +95,7 @@ func edit(cmd *cobra.Command, args []string) {
 	params := parseArgsAndFlags(cmd.Flags(), args, project)
 	params.appendBodySet = cmd.Flags().Changed("append-body")
 	params.prependBodySet = cmd.Flags().Changed("prepend-body")
+	params.adfBodySet = cmd.Flags().Changed("adf-body")
 	cmdutil.ExitIfError(checkDescriptionAdditions(params))
 	cmdutil.ExitIfError(checkADFBodyInstallation(params, viper.GetString("installation") == jira.InstallationTypeLocal))
 	cmdutil.ExitIfError(loadTemplate(params))
@@ -206,7 +207,8 @@ func edit(cmd *cobra.Command, args []string) {
 }
 
 // The description is written by a request of its own, which is returned instead of
-// made so that anything that makes it fail does so before the other fields are saved.
+// made so that building it fails before the other fields are saved. Jira only
+// validates an --adf-body document when it is written, so that can still fail after.
 func descriptionWriter(client *jira.Client, params *editParams) (func(skipNotify bool) error, error) {
 	if params.adfDoc != nil {
 		return adfDescriptionWrite(client, params.issueKey, params.adfDoc), nil
@@ -483,6 +485,7 @@ type editParams struct {
 	prependBodySet   bool
 	replacements     []replacement
 	adfBody          string
+	adfBodySet       bool
 	adfDoc           json.RawMessage
 	adfParsed        *adf.ADF
 	priority         string

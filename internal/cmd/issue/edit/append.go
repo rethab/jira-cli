@@ -16,6 +16,10 @@ var (
 )
 
 func checkDescriptionAdditions(params *editParams) error {
+	// An unset shell variable would otherwise turn the flag off and the command into a no-op.
+	if params.adfBodySet && params.adfBody == "" {
+		return errors.New("--adf-body needs a path, or - for standard input")
+	}
 	if params.adfBody != "" &&
 		(params.body != "" || params.template != "" || params.appendBodySet || params.prependBodySet || len(params.replacements) > 0) {
 		return errors.New("--adf-body can't be combined with --body, --template, --append-body, --prepend-body or --replace-body")

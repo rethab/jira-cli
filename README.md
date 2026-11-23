@@ -59,9 +59,8 @@ PR asking for it.
 **New flags**
 
 - `jira issue edit --type`: change the issue type in place.
-- `jira issue edit --original-estimate` [#801], `--template`, `--append-body`/`--prepend-body` (add to the end
-  or start of the description without rewriting it), `--replace-body` (change text in place), and `--adf-body`
-  (write an ADF description as is, Cloud).
+- `jira issue edit --original-estimate` [#801], `--template`, `--append-body`/`--prepend-body` (add to the end or
+  start of the description), `--replace-body` (change text in place), and `--adf-body` (write raw ADF, Cloud).
 - `jira issue transitions --fields`: list the fields each transition's screen asks for.
 - `jira issue move --path [--yes]`: find and take the transitions to a status several steps away.
 - `jira issue view --description`: print only the summary and description. [#933]

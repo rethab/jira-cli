@@ -82,7 +82,17 @@ func TestCheckDescriptionAdditions(t *testing.T) {
 				prependBody: "x", prependBodySet: true, appendBody: "y", appendBodySet: true,
 			},
 		},
-		{name: "adf alone", params: &editParams{adfBody: "doc.json"}},
+		{name: "adf alone", params: &editParams{adfBody: "doc.json", adfBodySet: true}},
+		{
+			name:    "adf given empty",
+			params:  &editParams{adfBodySet: true},
+			wantErr: "--adf-body needs a path, or - for standard input",
+		},
+		{
+			name:    "adf given empty with body",
+			params:  &editParams{adfBodySet: true, body: "b"},
+			wantErr: "--adf-body needs a path, or - for standard input",
+		},
 		{name: "adf with other fields", params: &editParams{adfBody: "-", summary: "s", labels: []string{"l"}}},
 		{
 			name:    "adf with body",

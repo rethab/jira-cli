@@ -58,6 +58,13 @@ func TestParseADFBody(t *testing.T) {
 		})
 	}
 
+	t.Run("byte order mark", func(t *testing.T) {
+		raw, doc, err := parseADFBody([]byte("\xef\xbb\xbf" + adfDocFixture))
+		require.NoError(t, err)
+		require.NotNil(t, doc)
+		assert.JSONEq(t, adfDocFixture, string(raw))
+	})
+
 	t.Run("sent unchanged, including what adf.Node doesn't model", func(t *testing.T) {
 		raw, _, err := parseADFBody([]byte(adfDocFixture))
 		require.NoError(t, err)
