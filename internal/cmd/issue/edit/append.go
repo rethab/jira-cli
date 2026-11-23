@@ -16,6 +16,14 @@ var (
 )
 
 func checkDescriptionAdditions(params *editParams) error {
+	// An unset shell variable would otherwise turn the flag off and the command into a no-op.
+	if params.adfBodySet && params.adfBody == "" {
+		return errors.New("--adf-body needs a path, or - for standard input")
+	}
+	if params.adfBody != "" &&
+		(params.body != "" || params.template != "" || params.appendBodySet || params.prependBodySet || len(params.replacements) > 0) {
+		return errors.New("--adf-body can't be combined with --body, --template, --append-body, --prepend-body or --replace-body")
+	}
 	if len(params.replacements) > 0 && (params.body != "" || params.template != "") {
 		return errors.New("--replace-body can't be combined with --body or --template")
 	}
@@ -42,7 +50,7 @@ func checkAddition(flag, value string, set bool, params *editParams) error {
 // stdin is common in scripts and agents, and its content would replace the
 // description instead.
 func shouldReadBodyFromStdin(params *editParams, stdinHasData bool) bool {
-	return params.body == "" && params.template == "" &&
+	return params.body == "" && params.template == "" && params.adfBody == "" &&
 		params.appendBody == "" && params.prependBody == "" && len(params.replacements) == 0 && stdinHasData
 }
 
@@ -50,7 +58,7 @@ func shouldReadBodyFromStdin(params *editParams, stdinHasData bool) bool {
 // else in it would be a second, empty update that Jira can still announce to
 // watchers. The assignee is set by a separate request and doesn't count.
 func onlyChangingDescription(params *editParams) bool {
-	return (params.appendBody != "" || params.prependBody != "" || len(params.replacements) > 0) &&
+	return (params.appendBody != "" || params.prependBody != "" || len(params.replacements) > 0 || params.adfBody != "") &&
 		params.summary == "" && params.body == "" && params.issueType == "" &&
 		params.parentIssueKey == "" && params.priority == "" && params.originalEstimate == "" &&
 		len(params.labels) == 0 && len(params.components) == 0 &&
