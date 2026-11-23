@@ -1,6 +1,6 @@
 ---
 name: api-gap
-description: Take a claim that the Jira REST API can do something this CLI can't, check it, and if it holds, ship it end to end. The steps are an Opus investigation that accepts or rejects the claim, a Sonnet TDD implementation with a PR, an Opus /code-review --fix pass, a squash merge, and a release. Use this whenever the user says something like "the API supports X but jira-cli doesn't", "there's no command for Y but the REST endpoint exists", "I had to curl the API to do Z", or asks to add a command or flag that wraps an existing Jira endpoint. Use it even when they don't say "API" outright, e.g. "why can't I do X with jira, Jira itself allows it".
+description: Take a claim that the Jira REST API can do something this CLI can't, check it, and if it holds, ship it end to end. The steps are an Opus investigation that accepts or rejects the claim, a Sonnet TDD implementation with a PR, an Opus /simplify and /code-review --fix pass, a squash merge, and a release. Use this whenever the user says something like "the API supports X but jira-cli doesn't", "there's no command for Y but the REST endpoint exists", "I had to curl the API to do Z", or asks to add a command or flag that wraps an existing Jira endpoint. Use it even when they don't say "API" outright, e.g. "why can't I do X with jira, Jira itself allows it".
 ---
 
 # api-gap: from "the API can do it" to a release
@@ -76,12 +76,12 @@ Check it yourself before moving on:
 - `gh pr checks <N> --repo rethab/jira-cli` must show every check passing.
 - `leak-check.sh pr <N> --forbid <input>` must be clean.
 
-## Stage 3: Code review with fixes (Opus)
+## Stage 3: Simplify and code review with fixes (Opus)
 
 Spawn a `general-purpose` agent with `model: "opus"`, `isolation: "worktree"`, and the prompt from
 `references/review.md`, passing the PR number, the branch, the absolute path of `leak-check.sh`, and the input file's
-absolute path (or "none"). It checks out the PR branch, runs `/code-review --fix`, pushes the fixes, and waits for
-green again.
+absolute path (or "none"). It checks out the PR branch, runs `/simplify` and then `/code-review --fix`, pushes the
+fixes, and waits for green again.
 
 When it returns, check again: the PR head must be the commit it reports pushing (or unchanged if there was nothing to
 fix), every check on it must pass, and `leak-check.sh pr <N> --forbid <input>` must be clean.
