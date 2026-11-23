@@ -14,6 +14,8 @@ import (
 	"github.com/rethab/jira-cli/pkg/jira"
 )
 
+const adfExclusive = "--adf-body can't be combined with --body, --template, --append-body, --prepend-body or --replace-body"
+
 func TestCheckDescriptionAdditions(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -80,6 +82,33 @@ func TestCheckDescriptionAdditions(t *testing.T) {
 				prependBody: "x", prependBodySet: true, appendBody: "y", appendBodySet: true,
 			},
 		},
+		{name: "adf alone", params: &editParams{adfBody: "doc.json"}},
+		{name: "adf with other fields", params: &editParams{adfBody: "-", summary: "s", labels: []string{"l"}}},
+		{
+			name:    "adf with body",
+			params:  &editParams{adfBody: "doc.json", body: "b"},
+			wantErr: adfExclusive,
+		},
+		{
+			name:    "adf with template",
+			params:  &editParams{adfBody: "doc.json", template: "t.tmpl"},
+			wantErr: adfExclusive,
+		},
+		{
+			name:    "adf with append",
+			params:  &editParams{adfBody: "doc.json", appendBody: "x", appendBodySet: true},
+			wantErr: adfExclusive,
+		},
+		{
+			name:    "adf with prepend",
+			params:  &editParams{adfBody: "doc.json", prependBody: "x", prependBodySet: true},
+			wantErr: adfExclusive,
+		},
+		{
+			name:    "adf with replace",
+			params:  &editParams{adfBody: "doc.json", replacements: []replacement{{"a", "b"}}},
+			wantErr: adfExclusive,
+		},
 	}
 
 	for _, tc := range tests {
@@ -118,6 +147,14 @@ func TestQuestionsSkipDescriptionEditorWhenExtending(t *testing.T) {
 	qs = ec.questions(&jira.Issue{}, "")
 	require.Len(t, qs, 1)
 	assert.Equal(t, "summary", qs[0].Name)
+
+	ec = editCmd{params: &editParams{summary: "kept", adfBody: "doc.json"}}
+	assert.Empty(t, ec.questions(&jira.Issue{}, ""))
+
+	ec = editCmd{params: &editParams{adfBody: "doc.json"}}
+	qs = ec.questions(&jira.Issue{}, "")
+	require.Len(t, qs, 1)
+	assert.Equal(t, "summary", qs[0].Name)
 }
 
 // Agents often run with a non-TTY stdin, and reading it would replace the
@@ -136,6 +173,7 @@ func TestShouldReadBodyFromStdin(t *testing.T) {
 		{name: "append body given", params: &editParams{appendBody: "a"}, stdin: true, want: false},
 		{name: "prepend body given", params: &editParams{prependBody: "p"}, stdin: true, want: false},
 		{name: "replace body given", params: &editParams{replacements: []replacement{{"a", "b"}}}, stdin: true, want: false},
+		{name: "adf body from stdin", params: &editParams{adfBody: "-"}, stdin: true, want: false},
 	}
 
 	for _, tc := range tests {
@@ -157,6 +195,8 @@ func TestOnlyChangingDescription(t *testing.T) {
 		{name: "prepend alone", params: &editParams{prependBody: "p"}, want: true},
 		{name: "replace alone", params: &editParams{replacements: []replacement{{"a", "b"}}}, want: true},
 		{name: "replace and summary", params: &editParams{replacements: []replacement{{"a", "b"}}, summary: "s"}, want: false},
+		{name: "adf alone", params: &editParams{adfBody: "doc.json"}, want: true},
+		{name: "adf and summary", params: &editParams{adfBody: "doc.json", summary: "s"}, want: false},
 		{name: "prepend and append", params: &editParams{prependBody: "p", appendBody: "a"}, want: true},
 		{name: "prepend and summary", params: &editParams{prependBody: "p", summary: "s"}, want: false},
 		{name: "nothing to add", params: &editParams{}, want: false},

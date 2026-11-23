@@ -60,7 +60,8 @@ PR asking for it.
 
 - `jira issue edit --type`: change the issue type in place.
 - `jira issue edit --original-estimate` [#801], `--template`, `--append-body`/`--prepend-body` (add to the end
-  or start of the description without rewriting it), and `--replace-body` (change text in place).
+  or start of the description without rewriting it), `--replace-body` (change text in place), and `--adf-body`
+  (write an ADF description as is, Cloud).
 - `jira issue transitions --fields`: list the fields each transition's screen asks for.
 - `jira issue move --path [--yes]`: find and take the transitions to a status several steps away.
 - `jira issue view --description`: print only the summary and description. [#933]
@@ -541,6 +542,10 @@ $ jira issue edit ISSUE-1 --prepend-body "**Update:** fixed in v2.0" --no-input
 # Repeat the flag to make several replacements in one update, and leave the replacement empty to delete text
 $ jira issue edit ISSUE-1 --replace-body "deploy on Friday:deploy on Monday" --replace-body "(draft) :" --no-input
 
+# Write the description as an Atlassian document (Jira Cloud only); read it with view --raw, change it, write it back
+# This drops the first block and keeps everything else, images and smart links included
+$ jira issue view ISSUE-1 --raw | jq '.fields.description | .content |= .[1:]' | jira issue edit ISSUE-1 --adf-body - --no-input
+
 # In the interactive prompt, "OriginalEstimate" can be picked under "What would you like to add?"
 
 # Set custom fields, by name or by id; cascading selects take "Parent->Child"
@@ -567,6 +572,16 @@ the first colon, so it can't contain one. On Jira Cloud the replacement is plain
 text it replaces, and a match must lie within text of one formatting: text that spans bold, a link, a mention or a
 smart link isn't found. On Jira Server the search and the replacement are wiki markup. If a search text isn't found,
 nothing is changed, not even the other fields given in the same command.
+
+`--adf-body <path|->` replaces the description with an Atlassian Document Format (ADF) document read from a file, or
+from standard input with `-`, for the edits the flags above can't express: swapping a block for a paragraph and a list,
+deleting a block, inserting in the middle, or changing text that spans formatting. The file holds the document itself,
+that is `.fields.description` of `jira issue view --raw`. It is sent as is: nothing is converted from Markdown,
+mentions aren't resolved, and nodes this CLI doesn't know are kept. Jira validates the document and its error is
+shown. It works on Jira Cloud only, since Server and Data Center store the description as wiki markup, and can't be
+combined with `--body`, `--template`, `--append-body`, `--prepend-body` or `--replace-body`. If the new document leaves
+out an inline image or attachment of the current description, the command refuses unless you pass
+`--allow-image-loss`. The description is written by its own request after any other fields given in the same command.
 
 #### Assign
 The `assign` command lets you assign a user to an issue.

@@ -57,6 +57,13 @@ func (c *Client) SetIssueDescription(key string, doc *adf.ADF, skipNotify bool) 
 	return c.setDescription(key, doc, skipNotify, apiVersion3)
 }
 
+// SetIssueDescriptionADF replaces the description with an ADF document sent as is via
+// PUT /rest/api/3/issue/{key}. Unlike SetIssueDescription it doesn't go through adf.ADF,
+// which would drop whatever node attributes it doesn't model.
+func (c *Client) SetIssueDescriptionADF(key string, doc json.RawMessage, skipNotify bool) error {
+	return c.setDescription(key, doc, skipNotify, apiVersion3)
+}
+
 // SetIssueDescriptionV2 replaces the description via PUT /rest/api/2/issue/{key}.
 func (c *Client) SetIssueDescriptionV2(key, wiki string, skipNotify bool) error {
 	return c.setDescription(key, wiki, skipNotify, apiVersion2)

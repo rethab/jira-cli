@@ -145,6 +145,36 @@ func (n *Node) hasMedia() bool {
 	return slices.ContainsFunc(n.Content, (*Node).hasMedia)
 }
 
+// MediaIDs returns the ids of the uploaded files embedded as media or inline media
+// at any depth, in document order. External media has a url and no id.
+func (a *ADF) MediaIDs() []string {
+	if a == nil {
+		return nil
+	}
+	var ids []string
+	for _, n := range a.Content {
+		ids = n.appendMediaIDs(ids)
+	}
+	return ids
+}
+
+func (n *Node) appendMediaIDs(ids []string) []string {
+	if n == nil {
+		return ids
+	}
+	if n.NodeType == NodeMedia || n.NodeType == NodeMediaInline {
+		if attrs, ok := n.Attributes.(map[string]any); ok {
+			if id, ok := attrs["id"].(string); ok && id != "" {
+				ids = append(ids, id)
+			}
+		}
+	}
+	for _, c := range n.Content {
+		ids = c.appendMediaIDs(ids)
+	}
+	return ids
+}
+
 // Node is an ADF content node.
 type Node struct {
 	NodeType   NodeType `json:"type"`

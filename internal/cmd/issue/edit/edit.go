@@ -1,6 +1,7 @@
 package edit
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -54,6 +55,9 @@ $ jira issue edit ISSUE-1 --prepend-body "**Update:** fixed in v2.0" --no-input
 # Replace text in the description; images, smart links and other content stay as they are
 $ jira issue edit ISSUE-1 --replace-body "Friday:Monday" --no-input
 
+# Write the description as an Atlassian document, sent as is (Jira Cloud only); read it with view --raw
+$ jira issue view ISSUE-1 --raw | jq '.fields.description | .content |= .[1:]' | jira issue edit ISSUE-1 --adf-body - --no-input
+
 # Use pipe to read the description body directly from standard input
 $ echo "Description from stdin" | jira issue edit ISSUE-1 -s"New updated summary"  --no-input
 
@@ -92,7 +96,9 @@ func edit(cmd *cobra.Command, args []string) {
 	params.appendBodySet = cmd.Flags().Changed("append-body")
 	params.prependBodySet = cmd.Flags().Changed("prepend-body")
 	cmdutil.ExitIfError(checkDescriptionAdditions(params))
+	cmdutil.ExitIfError(checkADFBodyInstallation(params, viper.GetString("installation") == jira.InstallationTypeLocal))
 	cmdutil.ExitIfError(loadTemplate(params))
+	cmdutil.ExitIfError(loadADFBody(params))
 
 	client := api.DefaultClient(params.debug)
 	ec := editCmd{
@@ -115,6 +121,8 @@ func edit(cmd *cobra.Command, args []string) {
 		return issue, nil
 	}()
 	cmdutil.ExitIfError(err)
+
+	cmdutil.ExitIfError(checkADFBodyImageLoss(issue, params))
 
 	originalBody := editorBody(issue)
 
@@ -149,20 +157,9 @@ func edit(cmd *cobra.Command, args []string) {
 	params.appendBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.appendBody, params.noInput)
 	params.prependBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.prependBody, params.noInput)
 
-	var writeDescription func(skipNotify bool) error
-	if params.prependBody != "" || params.appendBody != "" || len(params.replacements) > 0 {
-		local := viper.GetString("installation") == jira.InstallationTypeLocal
-		change := descriptionChange{
-			replacements: params.replacements,
-			prepend:      params.prependBody,
-			appendMd:     params.appendBody,
-		}
-		s := cmdutil.Info("Fetching the description...")
-		writeDescription, err = changeDescription(client, params.issueKey, change, local)
-		s.Stop()
-		if err != nil {
-			cmdutil.Failed("Nothing was updated: %s", err)
-		}
+	writeDescription, err := descriptionWriter(client, params)
+	if err != nil {
+		cmdutil.Failed("Nothing was updated: %s", err)
 	}
 
 	descriptionOnly := onlyChangingDescription(params)
@@ -206,6 +203,27 @@ func edit(cmd *cobra.Command, args []string) {
 		err := cmdutil.Navigate(server, params.issueKey)
 		cmdutil.ExitIfError(err)
 	}
+}
+
+// The description is written by a request of its own, which is returned instead of
+// made so that anything that makes it fail does so before the other fields are saved.
+func descriptionWriter(client *jira.Client, params *editParams) (func(skipNotify bool) error, error) {
+	if params.adfDoc != nil {
+		return adfDescriptionWrite(client, params.issueKey, params.adfDoc), nil
+	}
+	if params.prependBody == "" && params.appendBody == "" && len(params.replacements) == 0 {
+		return nil, nil
+	}
+
+	change := descriptionChange{
+		replacements: params.replacements,
+		prepend:      params.prependBody,
+		appendMd:     params.appendBody,
+	}
+	s := cmdutil.Info("Fetching the description...")
+	defer s.Stop()
+
+	return changeDescription(client, params.issueKey, change, viper.GetString("installation") == jira.InstallationTypeLocal)
 }
 
 // The editor always works with markdown, and the body coming out of it is always
@@ -420,7 +438,8 @@ func (ec *editCmd) questions(issue *jira.Issue, originalBody string) []*survey.Q
 		})
 	}
 
-	if ec.params.body != "" || ec.params.appendBody != "" || ec.params.prependBody != "" || len(ec.params.replacements) > 0 {
+	if ec.params.body != "" || ec.params.appendBody != "" || ec.params.prependBody != "" ||
+		len(ec.params.replacements) > 0 || ec.params.adfBody != "" {
 		return qs
 	}
 	// Any change made in the editor would be refused by checkImageLoss, discarding
@@ -463,6 +482,9 @@ type editParams struct {
 	prependBody      string
 	prependBodySet   bool
 	replacements     []replacement
+	adfBody          string
+	adfDoc           json.RawMessage
+	adfParsed        *adf.ADF
 	priority         string
 	assignee         string
 	labels           []string
@@ -519,6 +541,9 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 	replacements, err := parseReplacements(replaceBody)
 	cmdutil.ExitIfError(err)
 
+	adfBody, err := flags.GetString("adf-body")
+	cmdutil.ExitIfError(err)
+
 	priority, err := flags.GetString("priority")
 	cmdutil.ExitIfError(err)
 
@@ -554,7 +579,7 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 
 	// Reading the template consumes stdin, so there is nothing left to prompt on.
 	// An explicit --body wins over the template, in which case stdin is left alone.
-	if template == "-" && body == "" {
+	if (template == "-" && body == "") || adfBody == "-" {
 		noInput = true
 	}
 
@@ -570,6 +595,7 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 		appendBody:       appendBody,
 		prependBody:      prependBody,
 		replacements:     replacements,
+		adfBody:          adfBody,
 		priority:         priority,
 		assignee:         assignee,
 		labels:           labels,
@@ -669,6 +695,8 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().String("prepend-body", "", "Insert Markdown at the start of the description, leaving the existing content untouched")
 	cmd.Flags().StringArray("replace-body", []string{}, "Replace text in the description, leaving everything else untouched. "+
 		"Format <search>:<replace>, split on the first colon; repeatable")
+	cmd.Flags().String("adf-body", "", "Path to a file with the description as an Atlassian document (ADF JSON), "+
+		"or - for standard input; sent to Jira as is (Jira Cloud only)")
 	cmd.Flags().StringP("priority", "y", "", "Edit priority")
 	cmd.Flags().StringP("assignee", "a", "", "Edit assignee (email or display name)")
 	cmd.Flags().StringArrayP("label", "l", []string{}, "Append labels")
