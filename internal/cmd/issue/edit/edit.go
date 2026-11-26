@@ -253,13 +253,17 @@ func v3Writes(client *jira.Client, params *editParams, local bool) ([]v3Write, e
 }
 
 func adfFieldsName(params *editParams) string {
+	custom := "the custom fields"
+	if len(params.customADFFields) == 1 {
+		custom = "the custom field"
+	}
 	switch {
 	case params.adfDoc == nil:
-		return "the custom fields"
+		return custom
 	case len(params.customADFFields) == 0:
 		return "the description"
 	}
-	return "the description and the custom fields"
+	return "the description and " + custom
 }
 
 // The editor always works with markdown, and the body coming out of it is always

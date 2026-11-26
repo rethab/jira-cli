@@ -286,6 +286,29 @@ func TestADFFieldsWrite(t *testing.T) {
 	}
 }
 
+func TestADFFieldsName(t *testing.T) {
+	doc := json.RawMessage(adfDocFixture)
+	one := map[string]json.RawMessage{"customfield_10050": doc}
+	two := map[string]json.RawMessage{"customfield_10050": doc, "customfield_10051": doc}
+
+	tests := []struct {
+		name   string
+		params *editParams
+		want   string
+	}{
+		{"description", &editParams{adfDoc: doc}, "the description"},
+		{"one custom field", &editParams{customADFFields: one}, "the custom field"},
+		{"two custom fields", &editParams{customADFFields: two}, "the custom fields"},
+		{"description and one custom field", &editParams{adfDoc: doc, customADFFields: one}, "the description and the custom field"},
+		{"description and two custom fields", &editParams{adfDoc: doc, customADFFields: two}, "the description and the custom fields"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, adfFieldsName(tc.params))
+		})
+	}
+}
+
 func TestADFFieldsWriteWithNothingToWrite(t *testing.T) {
 	assert.Nil(t, adfFieldsWrite(nil, &editParams{issueKey: "TEST-1"}))
 }
