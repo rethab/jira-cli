@@ -37,7 +37,7 @@ func (c *Client) GetIssue(key string, opts ...filter.Filter) (*Issue, error) {
 
 	iss.Fields.Description = ifaceToADF(iss.Fields.Description)
 
-	total := iss.Fields.Comment.Total
+	total := min(iss.Fields.Comment.Total, len(iss.Fields.Comment.Comments))
 	limit := min(filter.Collection(opts).GetInt(issue.KeyIssueNumComments), total)
 	for i := total - 1; i >= total-limit; i-- {
 		body := iss.Fields.Comment.Comments[i].Body

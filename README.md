@@ -77,6 +77,7 @@ PR asking for it.
 - `@[Name]` in issue, epic, and comment bodies becomes a real mention, and editing keeps existing mentions. [#407]
 - Issue URLs of your own site render as smart links on Jira Cloud.
 - `jira issue view` shows the parent issue. [#766]
+- `jira issue view` shows each comment's id next to its author and date, for `comment edit|delete` and `--reply-to`.
 - `jira issue link` prints the link as it reads ("A blocks B"), and its prompt and help say which issue gets which
   wording.
 - `jira issue edit` won't replace a description that embeds images unless `--allow-image-loss` is passed. [#1005]
@@ -722,7 +723,8 @@ $ jira issue view ISSUE-1
 ![View an issue](.github/assets/view.gif)
 
 The view screen will display linked issues and the latest comment after the description. Note that the displayed comment may
-not be the latest one if you for some reason have more than 5k comments in a ticket.
+not be the latest one if you for some reason have more than 5k comments in a ticket. Each comment's header shows its id,
+which `jira issue comment edit`, `jira issue comment delete` and `jira issue comment add --reply-to` take.
 
 ```sh
 # Show 5 recent comments when viewing the issue
@@ -902,9 +904,9 @@ EOF
 ```
 
 ##### List
-The `list` command shows the comments of an issue, oldest first, including the id you need to edit or delete a comment.
-On Jira Cloud the raw output has the comment bodies in Atlassian Document Format, on Server and Data Center in wiki
-markup.
+The `list` command shows the comments of an issue, oldest first, including the id you need to edit or delete a comment
+(`jira issue view --comments N` shows the ids too). On Jira Cloud the raw output has the comment bodies in Atlassian
+Document Format, on Server and Data Center in wiki markup.
 
 ```sh
 $ jira issue comment list ISSUE-1
