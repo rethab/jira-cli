@@ -184,6 +184,8 @@ func TestShouldReadBodyFromStdin(t *testing.T) {
 		{name: "prepend body given", params: &editParams{prependBody: "p"}, stdin: true, want: false},
 		{name: "replace body given", params: &editParams{replacements: []replacement{{"a", "b"}}}, stdin: true, want: false},
 		{name: "adf body from stdin", params: &editParams{adfBody: "-"}, stdin: true, want: false},
+		{name: "custom adf from stdin", params: &editParams{customADF: []customADFValue{{key: "f", path: "-"}}}, stdin: true, want: false},
+		{name: "custom adf from a file", params: &editParams{customADF: []customADFValue{{key: "f", path: "doc.json"}}}, stdin: true, want: true},
 	}
 
 	for _, tc := range tests {
@@ -193,7 +195,9 @@ func TestShouldReadBodyFromStdin(t *testing.T) {
 	}
 }
 
-func TestOnlyChangingDescription(t *testing.T) {
+func TestOnlyV3Writes(t *testing.T) {
+	customADF := []customADFValue{{key: "f", path: "doc.json"}}
+
 	tests := []struct {
 		name   string
 		params *editParams
@@ -207,6 +211,11 @@ func TestOnlyChangingDescription(t *testing.T) {
 		{name: "replace and summary", params: &editParams{replacements: []replacement{{"a", "b"}}, summary: "s"}, want: false},
 		{name: "adf alone", params: &editParams{adfBody: "doc.json"}, want: true},
 		{name: "adf and summary", params: &editParams{adfBody: "doc.json", summary: "s"}, want: false},
+		{name: "custom adf alone", params: &editParams{customADF: customADF}, want: true},
+		{name: "custom adf and adf", params: &editParams{customADF: customADF, adfBody: "doc.json"}, want: true},
+		{name: "custom adf and append", params: &editParams{customADF: customADF, appendBody: "a"}, want: true},
+		{name: "custom adf and summary", params: &editParams{customADF: customADF, summary: "s"}, want: false},
+		{name: "custom adf and custom", params: &editParams{customADF: customADF, customFields: map[string]string{"g": "x"}}, want: false},
 		{name: "prepend and append", params: &editParams{prependBody: "p", appendBody: "a"}, want: true},
 		{name: "prepend and summary", params: &editParams{prependBody: "p", summary: "s"}, want: false},
 		{name: "nothing to add", params: &editParams{}, want: false},
@@ -224,7 +233,7 @@ func TestOnlyChangingDescription(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, onlyChangingDescription(tc.params))
+			assert.Equal(t, tc.want, onlyV3Writes(tc.params))
 		})
 	}
 }

@@ -1,6 +1,7 @@
 package edit
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -20,7 +21,10 @@ const (
 The body supports the same Markdown as 'jira issue comment add'. Whether the
 comment is internal and who can see it is left as it is.
 
-Use 'jira issue comment list' to find the id of a comment.`
+Use 'jira issue comment list' to find the id of a comment. With --adf-body the new
+body is an Atlassian document instead (Jira Cloud only), which is sent as is so that
+inline cards, mentions, panels and the like survive; read the current one with
+'jira issue comment list --raw'.`
 	examples = `# Edit the comment in your editor, starting from its current body
 $ jira issue comment edit ISSUE-1 10042
 
@@ -43,7 +47,10 @@ $ jira issue comment edit ISSUE-1 10042 --template -
 $ echo "Comment from stdin" | jira issue comment edit ISSUE-1 10042
 
 # Positional argument takes precedence over the body and template flags
-$ jira issue comment edit ISSUE-1 10042 "comment from arg" --template /path/to/template.tmpl`
+$ jira issue comment edit ISSUE-1 10042 "comment from arg" --template /path/to/template.tmpl
+
+# Write the body as an Atlassian document, sent as is (Jira Cloud only); read it with comment list --raw
+$ jira issue comment list ISSUE-1 --raw | jq '.[] | select(.id == "10042") | .body' | jira issue comment edit ISSUE-1 10042 --adf-body - --no-input`
 )
 
 // NewCmdCommentEdit is a comment edit command.
@@ -65,6 +72,8 @@ func NewCmdCommentEdit() *cobra.Command {
 
 	cmd.Flags().String("body", "", "New body of the comment; the positional argument takes precedence")
 	cmd.Flags().StringP("template", "T", "", "Path to a file to read comment body from")
+	cmd.Flags().String("adf-body", "", "Path to a file with the comment body as an Atlassian document (ADF JSON), "+
+		"or - for standard input; sent to Jira as is (Jira Cloud only)")
 	cmd.Flags().Bool("no-input", false, "Disable prompt for non-required fields")
 
 	return &cmd
@@ -85,19 +94,64 @@ func edit(cmd *cobra.Command, args []string) {
 	template, err := cmd.Flags().GetString("template")
 	cmdutil.ExitIfError(err)
 
-	noInput, err := cmd.Flags().GetBool("no-input")
+	adfBody, err := cmd.Flags().GetString("adf-body")
 	cmdutil.ExitIfError(err)
 
-	if cmdutil.StdinHasData() || template == "-" {
-		noInput = true
-	}
-
-	client := api.DefaultClient(viper.GetBool("debug"))
+	noInput, err := cmd.Flags().GetBool("no-input")
+	cmdutil.ExitIfError(err)
 
 	if body == "" {
 		body = flagBody
 	}
 
+	var adfDoc json.RawMessage
+	if cmd.Flags().Changed("adf-body") {
+		cmdutil.ExitIfError(checkADFBody(adfBodyFlags{
+			path:     adfBody,
+			body:     body,
+			template: template,
+		}, viper.GetString("installation") == jira.InstallationTypeLocal))
+
+		adfDoc, err = loadADFBody(adfBody)
+		cmdutil.ExitIfError(err)
+	}
+
+	if cmdutil.StdinHasData() || template == "-" || adfBody == "-" {
+		noInput = true
+	}
+
+	client := api.DefaultClient(viper.GetBool("debug"))
+
+	update := func() error { return client.EditIssueCommentADF(issueKey, commentID, adfDoc) }
+	if adfDoc == nil {
+		body = markdownBody(client, issueKey, commentID, body, template, noInput)
+		update = func() error { return client.EditIssueComment(issueKey, commentID, body) }
+	}
+
+	if !noInput {
+		answer := struct{ Action string }{}
+		cmdutil.ExitIfError(survey.Ask([]*survey.Question{nextAction()}, &answer))
+
+		if answer.Action == cmdcommon.ActionCancel {
+			cmdutil.Failed("Action aborted")
+		}
+	}
+
+	err = func() error {
+		s := cmdutil.Info("Updating comment")
+		defer s.Stop()
+
+		return update()
+	}()
+	cmdutil.ExitIfError(err)
+
+	cmdutil.Success("Comment %q of issue %q updated", commentID, issueKey)
+	fmt.Println(cmdutil.GenerateServerBrowseURL(viper.GetString("server"), issueKey))
+}
+
+// markdownBody returns the new body when it is given as Markdown, from the arguments, the
+// template, standard input or the editor, with mentions resolved.
+func markdownBody(client *jira.Client, issueKey, commentID, body, template string, noInput bool) string {
 	// Stdin is only read when no body was passed, so a script that gives one
 	// never blocks on a pipe nobody closes.
 	if body == "" && (template != "" || cmdutil.StdinHasData()) {
@@ -116,27 +170,7 @@ func edit(cmd *cobra.Command, args []string) {
 		body = askBody(client, issueKey, commentID)
 	}
 
-	body = cmdcommon.ResolveMentions(client, issueKey, "", body, noInput)
-
-	if !noInput {
-		answer := struct{ Action string }{}
-		cmdutil.ExitIfError(survey.Ask([]*survey.Question{nextAction()}, &answer))
-
-		if answer.Action == cmdcommon.ActionCancel {
-			cmdutil.Failed("Action aborted")
-		}
-	}
-
-	err = func() error {
-		s := cmdutil.Info("Updating comment")
-		defer s.Stop()
-
-		return client.EditIssueComment(issueKey, commentID, body)
-	}()
-	cmdutil.ExitIfError(err)
-
-	cmdutil.Success("Comment %q of issue %q updated", commentID, issueKey)
-	fmt.Println(cmdutil.GenerateServerBrowseURL(viper.GetString("server"), issueKey))
+	return cmdcommon.ResolveMentions(client, issueKey, "", body, noInput)
 }
 
 // askBody opens the editor on the comment's current body. The body is turned
