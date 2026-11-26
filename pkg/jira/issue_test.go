@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rethab/jira-cli/pkg/adf"
+	"github.com/rethab/jira-cli/pkg/jira/filter/issue"
 )
 
 const (
@@ -150,6 +151,22 @@ func TestGetIssueWithoutDescription(t *testing.T) {
 		},
 	}
 	assert.Equal(t, expected, actual)
+}
+
+func TestGetIssueCommentTotalBeyondEmbedded(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"key":"TEST-1","fields":{"comment":{"total":5001,"comments":[
+			{"id":"10001","body":{"version":1,"type":"doc","content":[]}}
+		]}}}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+	actual, err := client.GetIssue("TEST-1", issue.NewNumCommentsFilter(5))
+	require.NoError(t, err)
+	assert.IsType(t, &adf.ADF{}, actual.Fields.Comment.Comments[0].Body)
 }
 
 func TestGetIssueV2(t *testing.T) {

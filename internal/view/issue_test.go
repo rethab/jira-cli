@@ -366,7 +366,7 @@ func TestIssueCommentMetaShowsID(t *testing.T) {
 			Options: IssueOption{NumComments: 1},
 		}
 
-		assert.Contains(t, issue.comments()[0].meta, "• ID: 10033 • ")
+		assert.Contains(t, issue.comments()[0].meta, "• "+coloredOut("ID: 10033", color.FgHiBlack)+" • ")
 	})
 
 	t.Run("empty id", func(t *testing.T) {
@@ -383,6 +383,21 @@ func TestIssueCommentMetaShowsID(t *testing.T) {
 
 		assert.NotContains(t, issue.comments()[0].meta, "ID:")
 	})
+}
+
+func TestIssueCommentsTotalBeyondEmbedded(t *testing.T) {
+	t.Parallel()
+
+	data := decoratedIssue()
+	data.Fields.Comment.Total = len(data.Fields.Comment.Comments) + 5000
+	issue := Issue{
+		Server:  "https://test.local",
+		Data:    data,
+		Display: DisplayFormat{Plain: true},
+		Options: IssueOption{NumComments: 1},
+	}
+
+	assert.Len(t, issue.comments(), 1)
 }
 
 // Not parallel: it flips the global color.NoColor, which is only safe once

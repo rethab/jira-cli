@@ -469,7 +469,9 @@ func (i Issue) linkedIssues() string {
 }
 
 func (i Issue) comments() []issueComment {
-	total := i.Data.Fields.Comment.Total
+	// Total counts every comment, but the response embeds at most a few
+	// thousand of them, so indexing by Total alone can run past the slice.
+	total := min(i.Data.Fields.Comment.Total, len(i.Data.Fields.Comment.Comments))
 	comments := make([]issueComment, 0, total)
 
 	if total == 0 {
