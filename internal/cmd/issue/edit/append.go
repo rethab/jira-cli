@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/rethab/jira-cli/internal/cmdcommon"
@@ -51,14 +52,16 @@ func checkAddition(flag, value string, set bool, params *editParams) error {
 // description instead.
 func shouldReadBodyFromStdin(params *editParams, stdinHasData bool) bool {
 	return params.body == "" && params.template == "" && params.adfBody == "" &&
-		params.appendBody == "" && params.prependBody == "" && len(params.replacements) == 0 && stdinHasData
+		params.appendBody == "" && params.prependBody == "" && len(params.replacements) == 0 &&
+		!slices.ContainsFunc(params.customADF, func(v customADFValue) bool { return v.path == "-" }) && stdinHasData
 }
 
-// The description write is a request of its own, so an edit request with nothing
-// else in it would be a second, empty update that Jira can still announce to
+// The description and ADF fields are written by requests of their own, so an edit request
+// with nothing else in it would be a second, empty update that Jira can still announce to
 // watchers. The assignee is set by a separate request and doesn't count.
-func onlyChangingDescription(params *editParams) bool {
-	return (params.appendBody != "" || params.prependBody != "" || len(params.replacements) > 0 || params.adfBody != "") &&
+func onlyV3Writes(params *editParams) bool {
+	return (params.appendBody != "" || params.prependBody != "" || len(params.replacements) > 0 ||
+		params.adfBody != "" || len(params.customADF) > 0) &&
 		params.summary == "" && params.body == "" && params.issueType == "" &&
 		params.parentIssueKey == "" && params.priority == "" && params.originalEstimate == "" &&
 		len(params.labels) == 0 && len(params.components) == 0 &&

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -58,6 +59,9 @@ $ jira issue edit ISSUE-1 --replace-body "Friday:Monday" --no-input
 # Write the description as an Atlassian document, sent as is (Jira Cloud only); read it with view --raw
 $ jira issue view ISSUE-1 --raw | jq '.fields.description | .content |= .[1:]' | jira issue edit ISSUE-1 --adf-body - --no-input
 
+# Set a multi-line custom field as an Atlassian document, sent as is (Jira Cloud only); read it with view --raw
+$ jira issue view ISSUE-1 --raw | jq '.fields.customfield_10050' > f.json && jira issue edit ISSUE-1 --custom-adf customfield_10050=f.json --no-input
+
 # Use pipe to read the description body directly from standard input
 $ echo "Description from stdin" | jira issue edit ISSUE-1 -s"New updated summary"  --no-input
 
@@ -96,10 +100,13 @@ func edit(cmd *cobra.Command, args []string) {
 	params.appendBodySet = cmd.Flags().Changed("append-body")
 	params.prependBodySet = cmd.Flags().Changed("prepend-body")
 	params.adfBodySet = cmd.Flags().Changed("adf-body")
+	local := viper.GetString("installation") == jira.InstallationTypeLocal
 	cmdutil.ExitIfError(checkDescriptionAdditions(params))
-	cmdutil.ExitIfError(checkADFBodyInstallation(params, viper.GetString("installation") == jira.InstallationTypeLocal))
+	cmdutil.ExitIfError(checkADFBodyInstallation(params, local))
+	cmdutil.ExitIfError(checkCustomADF(params, local))
 	cmdutil.ExitIfError(loadTemplate(params))
 	cmdutil.ExitIfError(loadADFBody(params))
+	cmdutil.ExitIfError(loadCustomADF(params))
 
 	client := api.DefaultClient(params.debug)
 	ec := editCmd{
@@ -107,7 +114,14 @@ func edit(cmd *cobra.Command, args []string) {
 		params: params,
 	}
 
-	customFields, err := cmdcommon.ResolveCustomFields(client, params.customFields)
+	lookup := customADFKeys(params.customADF)
+	for key, value := range params.customFields {
+		lookup[key] = value
+	}
+	customFields, err := cmdcommon.ResolveCustomFields(client, lookup)
+	cmdutil.ExitIfError(err)
+
+	params.customADFFields, err = resolveCustomADF(params.customADF, params.customFields, customFields)
 	cmdutil.ExitIfError(err)
 
 	issue, err := func() (*jira.Issue, error) {
@@ -158,13 +172,13 @@ func edit(cmd *cobra.Command, args []string) {
 	params.appendBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.appendBody, params.noInput)
 	params.prependBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.prependBody, params.noInput)
 
-	writeDescription, err := descriptionWriter(client, params)
+	writes, err := v3Writes(client, params)
 	if err != nil {
 		cmdutil.Failed("Nothing was updated: %s", err)
 	}
 
-	descriptionOnly := onlyChangingDescription(params)
-	if !descriptionOnly {
+	onlyV3 := onlyV3Writes(params)
+	if !onlyV3 {
 		edr := buildEditRequest(client, project, issue, params)
 		edr.WithCustomFields(customFields)
 
@@ -181,18 +195,18 @@ func edit(cmd *cobra.Command, args []string) {
 		cmdutil.ExitIfError(err)
 	}
 
-	if writeDescription != nil {
+	for i, w := range writes {
 		err := func() error {
-			s := cmdutil.Info("Updating the description...")
+			s := cmdutil.Info("Updating " + w.what + "...")
 			defer s.Stop()
 
-			return writeDescription(params.skipNotify)
+			return w.write(params.skipNotify)
 		}()
-		if err != nil && descriptionOnly {
-			cmdutil.Failed("Updating the description failed: %s", err)
+		if err != nil && onlyV3 && i == 0 {
+			cmdutil.Failed("Updating %s failed: %s", w.what, err)
 		}
 		if err != nil {
-			cmdutil.Failed("Other changes were saved, but updating the description failed: %s", err)
+			cmdutil.Failed("Other changes were saved, but updating %s failed: %s", w.what, err)
 		}
 	}
 
@@ -206,26 +220,47 @@ func edit(cmd *cobra.Command, args []string) {
 	}
 }
 
-// The description is written by a request of its own, which is returned instead of
-// made so that building it fails before the other fields are saved. Jira only
-// validates an --adf-body document when it is written, so that can still fail after.
-func descriptionWriter(client *jira.Client, params *editParams) (func(skipNotify bool) error, error) {
-	if params.adfDoc != nil {
-		return adfDescriptionWrite(client, params.issueKey, params.adfDoc), nil
-	}
-	if params.prependBody == "" && params.appendBody == "" && len(params.replacements) == 0 {
-		return nil, nil
+type v3Write struct {
+	what  string
+	write func(skipNotify bool) error
+}
+
+// These are requests of their own, which are returned instead of made so that building
+// them fails before the other fields are saved. Jira only validates an --adf-body or
+// --custom-adf document when it is written, so that can still fail after.
+func v3Writes(client *jira.Client, params *editParams) ([]v3Write, error) {
+	var writes []v3Write
+
+	if params.prependBody != "" || params.appendBody != "" || len(params.replacements) > 0 {
+		change := descriptionChange{
+			replacements: params.replacements,
+			prepend:      params.prependBody,
+			appendMd:     params.appendBody,
+		}
+		s := cmdutil.Info("Fetching the description...")
+		write, err := changeDescription(client, params.issueKey, change, viper.GetString("installation") == jira.InstallationTypeLocal)
+		s.Stop()
+		if err != nil {
+			return nil, err
+		}
+		writes = append(writes, v3Write{what: "the description", write: write})
 	}
 
-	change := descriptionChange{
-		replacements: params.replacements,
-		prepend:      params.prependBody,
-		appendMd:     params.appendBody,
+	if write := adfFieldsWrite(client, params); write != nil {
+		writes = append(writes, v3Write{what: adfFieldsName(params), write: write})
 	}
-	s := cmdutil.Info("Fetching the description...")
-	defer s.Stop()
 
-	return changeDescription(client, params.issueKey, change, viper.GetString("installation") == jira.InstallationTypeLocal)
+	return writes, nil
+}
+
+func adfFieldsName(params *editParams) string {
+	switch {
+	case params.adfDoc == nil:
+		return "the custom fields"
+	case len(params.customADFFields) == 0:
+		return "the description"
+	}
+	return "the description and the custom fields"
 }
 
 // The editor always works with markdown, and the body coming out of it is always
@@ -488,6 +523,8 @@ type editParams struct {
 	adfBodySet       bool
 	adfDoc           json.RawMessage
 	adfParsed        *adf.ADF
+	customADF        []customADFValue
+	customADFFields  map[string]json.RawMessage
 	priority         string
 	assignee         string
 	labels           []string
@@ -547,6 +584,12 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 	adfBody, err := flags.GetString("adf-body")
 	cmdutil.ExitIfError(err)
 
+	customADFFlags, err := flags.GetStringArray("custom-adf")
+	cmdutil.ExitIfError(err)
+
+	customADF, err := parseCustomADF(customADFFlags)
+	cmdutil.ExitIfError(err)
+
 	priority, err := flags.GetString("priority")
 	cmdutil.ExitIfError(err)
 
@@ -582,7 +625,8 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 
 	// Reading the template consumes stdin, so there is nothing left to prompt on.
 	// An explicit --body wins over the template, in which case stdin is left alone.
-	if (template == "-" && body == "") || adfBody == "-" {
+	if (template == "-" && body == "") || adfBody == "-" ||
+		slices.ContainsFunc(customADF, func(v customADFValue) bool { return v.path == "-" }) {
 		noInput = true
 	}
 
@@ -599,6 +643,7 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 		prependBody:      prependBody,
 		replacements:     replacements,
 		adfBody:          adfBody,
+		customADF:        customADF,
 		priority:         priority,
 		assignee:         assignee,
 		labels:           labels,
@@ -700,6 +745,8 @@ func setFlags(cmd *cobra.Command) {
 		"Format <search>:<replace>, split on the first colon; repeatable")
 	cmd.Flags().String("adf-body", "", "Path to a file with the description as an Atlassian document (ADF JSON), "+
 		"or - for standard input; sent to Jira as is (Jira Cloud only)")
+	cmd.Flags().StringArray("custom-adf", []string{}, "Set a multi-line custom field to an Atlassian document read from a file, "+
+		"or - for standard input. Format <field>=<path|->, field by id or name like --custom; repeatable (Jira Cloud only)")
 	cmd.Flags().StringP("priority", "y", "", "Edit priority")
 	cmd.Flags().StringP("assignee", "a", "", "Edit assignee (email or display name)")
 	cmd.Flags().StringArrayP("label", "l", []string{}, "Append labels")

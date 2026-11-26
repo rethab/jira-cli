@@ -193,7 +193,7 @@ func TestShouldReadBodyFromStdin(t *testing.T) {
 	}
 }
 
-func TestOnlyChangingDescription(t *testing.T) {
+func TestOnlyV3Writes(t *testing.T) {
 	tests := []struct {
 		name   string
 		params *editParams
@@ -224,7 +224,7 @@ func TestOnlyChangingDescription(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, onlyChangingDescription(tc.params))
+			assert.Equal(t, tc.want, onlyV3Writes(tc.params))
 		})
 	}
 }

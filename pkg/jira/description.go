@@ -54,19 +54,25 @@ func (c *Client) GetIssueDescriptionV2(key string) (string, error) {
 
 // SetIssueDescription replaces the description via PUT /rest/api/3/issue/{key}.
 func (c *Client) SetIssueDescription(key string, doc *adf.ADF, skipNotify bool) error {
-	return c.setDescription(key, doc, skipNotify, apiVersion3)
+	return c.setFields(key, map[string]any{"description": doc}, skipNotify, apiVersion3)
 }
 
 // SetIssueDescriptionADF replaces the description with an ADF document sent as is via
 // PUT /rest/api/3/issue/{key}. Unlike SetIssueDescription it doesn't go through adf.ADF,
 // which would drop whatever node attributes it doesn't model.
 func (c *Client) SetIssueDescriptionADF(key string, doc json.RawMessage, skipNotify bool) error {
-	return c.setDescription(key, doc, skipNotify, apiVersion3)
+	return c.SetIssueFieldsADF(key, map[string]json.RawMessage{"description": doc}, skipNotify)
+}
+
+// SetIssueFieldsADF sets fields that take ADF (description, textarea custom fields) to documents sent as is
+// via PUT /rest/api/3/issue/{key}.
+func (c *Client) SetIssueFieldsADF(key string, fields map[string]json.RawMessage, skipNotify bool) error {
+	return c.setFields(key, fields, skipNotify, apiVersion3)
 }
 
 // SetIssueDescriptionV2 replaces the description via PUT /rest/api/2/issue/{key}.
 func (c *Client) SetIssueDescriptionV2(key, wiki string, skipNotify bool) error {
-	return c.setDescription(key, wiki, skipNotify, apiVersion2)
+	return c.setFields(key, map[string]any{"description": wiki}, skipNotify, apiVersion2)
 }
 
 func (c *Client) getDescription(key, ver string) (json.RawMessage, error) {
@@ -106,8 +112,8 @@ func (c *Client) getDescription(key, ver string) (json.RawMessage, error) {
 	return out.Fields.Description, nil
 }
 
-func (c *Client) setDescription(key string, description any, skipNotify bool, ver string) error {
-	body, err := json.Marshal(map[string]any{"fields": map[string]any{"description": description}})
+func (c *Client) setFields(key string, fields any, skipNotify bool, ver string) error {
+	body, err := json.Marshal(map[string]any{"fields": fields})
 	if err != nil {
 		return err
 	}

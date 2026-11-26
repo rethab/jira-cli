@@ -43,8 +43,8 @@ PR asking for it.
 
 - `jira issue worklog list|edit|delete` and `jira worklog list`: manage worklogs by id, and list what a user logged on
   a day across all issues. [#908]
-- `jira issue comment list|edit|delete` and `comment add --reply-to ID`: manage comments by id, and reply with a quote.
-  [#975]
+- `jira issue comment list|edit|delete`, `comment add --reply-to ID` and `comment edit --adf-body`: manage comments by
+  id, reply with a quote, and write a body as raw ADF (Cloud). [#975]
 - `jira issue attachment add|list|download`: upload, list, and download attachments. [#986]
 - `jira issue transitions`: list the transitions an issue can take, without moving it.
 - `jira issue link types`: list link type names with their outward and inward wording.
@@ -60,7 +60,8 @@ PR asking for it.
 
 - `jira issue edit --type`: change the issue type in place.
 - `jira issue edit --original-estimate` [#801], `--template`, `--append-body`/`--prepend-body` (add to the end or
-  start of the description), `--replace-body` (change text in place), and `--adf-body` (write raw ADF, Cloud).
+  start of the description), `--replace-body` (change text in place), and `--adf-body`/`--custom-adf` (write the
+  description or a multi-line custom field as raw ADF, Cloud).
 - `jira issue transitions --fields`: list the fields each transition's screen asks for.
 - `jira issue move --path [--yes]`: find and take the transitions to a status several steps away.
 - `jira issue view --description`: print only the summary and description. [#933]
@@ -551,6 +552,11 @@ $ jira issue view ISSUE-1 --raw | jq '.fields.description | .content |= .[1:]' |
 # See Create for how the fields are matched and `jira issue fields` for the values a field accepts
 $ jira issue edit ISSUE-1 --custom story-points=5 --custom platform-component="Pipelines/Scripts->Release"
 
+# Write a multi-line custom field as an Atlassian document (Jira Cloud only); read it with view --raw, change it, write it back
+$ jira issue view ISSUE-1 --raw | jq '.fields.customfield_10050' > field.json
+$ $EDITOR field.json
+$ jira issue edit ISSUE-1 --custom-adf customfield_10050=field.json --no-input
+
 # Use minus (-) to remove label, component or fixVersion
 # For instance, to edit issue to
 #   - remove label p2, component FE, fixVersion v1.0
@@ -581,6 +587,15 @@ shown. It works on Jira Cloud only, since Server and Data Center store the descr
 combined with `--body`, `--template`, `--append-body`, `--prepend-body` or `--replace-body`. If the new document leaves
 out an inline image or attachment of the current description, the command refuses unless you pass
 `--allow-image-loss`. The description is written by its own request after any other fields given in the same command.
+
+`--custom-adf <field>=<path|->` does the same for a multi-line (`textarea`) custom field: the file, or standard input
+with `-`, holds the field's document, that is `.fields.<field id>` of `jira issue view --raw`, and it is sent as is.
+The field is matched like in `--custom`, by id or by its name in lower case with dashes, eg `acceptance-criteria`. Jira
+rejects ADF for single-line text fields and its error is shown. It works on Jira Cloud only; on Server and Data Center
+`--custom` already writes wiki markup as is. It can be repeated, but only one of `--template -`, `--adf-body -` and
+`--custom-adf <field>=-` can read standard input, and a field can't also be given to `--custom`. Together with
+`--adf-body`, the description and the custom fields are written by one request after the other fields, so watchers are
+notified once.
 
 #### Assign
 The `assign` command lets you assign a user to an issue.
@@ -929,7 +944,20 @@ $ jira issue comment update ISSUE-1 "$id" --body "Plan v2" --no-input
 # Load the new body from a template file or from standard input
 $ jira issue comment edit ISSUE-1 10042 --template /path/to/template.tmpl
 $ echo "Comment from stdin" | jira issue comment edit ISSUE-1 10042
+
+# Change one sentence and keep the smart links, mentions and panels around it (Jira Cloud only)
+$ jira issue comment list ISSUE-1 --raw \
+    | jq '.[] | select(.id == "10042") | .body | (.. | objects | select(.type == "text") | .text) |= sub("on Friday"; "on Monday")' \
+    | jira issue comment edit ISSUE-1 10042 --adf-body - --no-input
 ```
+
+`--adf-body <path|->` replaces the body with an Atlassian Document Format (ADF) document read from a file, or from
+standard input with `-`, for the edits Markdown can't express without flattening the rest of the comment. The file holds
+the document itself, that is `.body` of one comment of `jira issue comment list --raw`. It is sent as is: nothing is
+converted from Markdown, mentions aren't resolved, and nodes this CLI doesn't know are kept. Jira validates the
+document and its error is shown. It works on Jira Cloud only, since Server and Data Center store comments as wiki
+markup, and can't be combined with a body, `--body` or `--template`. Whether the comment is internal, and who it is
+visible to, is kept as it is.
 
 ##### Delete
 The `delete` command deletes a comment after asking for confirmation. Pass `--no-input` to skip the confirmation.

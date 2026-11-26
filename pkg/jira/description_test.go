@@ -229,6 +229,47 @@ func TestSetIssueDescriptionADF(t *testing.T) {
 	})
 }
 
+func TestSetIssueFieldsADF(t *testing.T) {
+	const (
+		field = `{"version":1,"type":"doc","content":[{"type":"paragraph","content":[` +
+			`{"type":"status","attrs":{"text":"DONE","color":"green"}}]}]}`
+		description = `{"version":1,"type":"doc","content":[{"type":"paragraph","attrs":{"localId":"abc"},"content":[` +
+			`{"type":"inlineCard","attrs":{"url":"https://example.atlassian.net/browse/TEST-2"}}]}]}`
+	)
+	fields := map[string]json.RawMessage{
+		"customfield_10050": json.RawMessage(field),
+		"description":       json.RawMessage(description),
+	}
+
+	t.Run("sends every field to v3 in one request as is", func(t *testing.T) {
+		client, got := captureWrite(t, http.StatusNoContent, "")
+
+		assert.NoError(t, client.SetIssueFieldsADF("TEST-1", fields, false))
+		assert.Equal(t, http.MethodPut, got.method)
+		assert.Equal(t, "/rest/api/3/issue/TEST-1", got.path)
+		assert.Empty(t, got.query)
+		assert.JSONEq(t, `{"fields":{"customfield_10050":`+field+`,"description":`+description+`}}`, got.body)
+	})
+
+	t.Run("skip notify", func(t *testing.T) {
+		client, got := captureWrite(t, http.StatusNoContent, "")
+
+		assert.NoError(t, client.SetIssueFieldsADF("TEST-1", fields, true))
+		assert.Equal(t, "notifyUsers=false", got.query)
+	})
+
+	t.Run("unexpected response", func(t *testing.T) {
+		client, _ := captureWrite(t, http.StatusBadRequest,
+			`{"errorMessages":[],"errors":{"customfield_10050":"Operation value must be a string"}}`)
+
+		err := client.SetIssueFieldsADF("TEST-1", fields, false)
+		var unexpected *ErrUnexpectedResponse
+		require.ErrorAs(t, err, &unexpected)
+		assert.Equal(t, http.StatusBadRequest, unexpected.StatusCode)
+		assert.Equal(t, "Operation value must be a string", unexpected.Body.Errors["customfield_10050"])
+	})
+}
+
 func TestSetIssueDescriptionV2(t *testing.T) {
 	t.Run("sends the wiki markup to v2", func(t *testing.T) {
 		client, got := captureWrite(t, http.StatusNoContent, "")

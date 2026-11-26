@@ -39,70 +39,6 @@ func mediaDoc(t *testing.T, ids ...string) *adf.ADF {
 	return &adf.ADF{Version: 1, DocType: "doc", Content: nodes}
 }
 
-func TestParseADFBody(t *testing.T) {
-	const notADoc = `--adf-body must be an Atlassian document: a JSON object with "type": "doc", "version": 1 and a "content" array`
-
-	valid := []struct {
-		name, in string
-	}{
-		{"document", adfDocFixture},
-		{"surrounding whitespace", "\n  " + adfDocFixture + "\n"},
-		{"empty content clears the description", `{"version":1,"type":"doc","content":[]}`},
-	}
-	for _, tc := range valid {
-		t.Run(tc.name, func(t *testing.T) {
-			raw, doc, err := parseADFBody([]byte(tc.in))
-			require.NoError(t, err)
-			require.NotNil(t, doc)
-			assert.JSONEq(t, tc.in, string(raw))
-		})
-	}
-
-	t.Run("byte order mark", func(t *testing.T) {
-		raw, doc, err := parseADFBody([]byte("\xef\xbb\xbf" + adfDocFixture))
-		require.NoError(t, err)
-		require.NotNil(t, doc)
-		assert.JSONEq(t, adfDocFixture, string(raw))
-	})
-
-	t.Run("sent unchanged, including what adf.Node doesn't model", func(t *testing.T) {
-		raw, _, err := parseADFBody([]byte(adfDocFixture))
-		require.NoError(t, err)
-		assert.Contains(t, string(raw), `"localId":"abc"`)
-	})
-
-	invalid := []struct {
-		name, in, wantErr string
-	}{
-		{"empty", "", "--adf-body is empty"},
-		{"whitespace", " \n\t", "--adf-body is empty"},
-		{"not json", "not json", "--adf-body is not valid JSON"},
-		{
-			"view --raw output",
-			`{"key":"TEST-1","fields":{"description":` + adfDocFixture + `}}`,
-			".fields.description",
-		},
-		{"wrong type", `{"version":1,"type":"paragraph","content":[]}`, notADoc},
-		{"wrong version", `{"version":2,"type":"doc","content":[]}`, notADoc},
-		{"missing version", `{"type":"doc","content":[]}`, notADoc},
-		{"missing content", `{"version":1,"type":"doc"}`, notADoc},
-		{"content is an object", `{"version":1,"type":"doc","content":{}}`, notADoc},
-		{"content is null", `{"version":1,"type":"doc","content":null}`, notADoc},
-		{"array", `[]`, notADoc},
-		{"string", `"text"`, notADoc},
-		{"null", `null`, notADoc},
-	}
-	for _, tc := range invalid {
-		t.Run(tc.name, func(t *testing.T) {
-			raw, doc, err := parseADFBody([]byte(tc.in))
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tc.wantErr)
-			assert.Nil(t, raw)
-			assert.Nil(t, doc)
-		})
-	}
-}
-
 func TestCheckADFImageLoss(t *testing.T) {
 	external := &adf.ADF{Version: 1, DocType: "doc", Content: []*adf.Node{{
 		NodeType:   adf.NodeMedia,
@@ -212,7 +148,7 @@ func TestAdfDescriptionWriteSendsTheDocumentOnly(t *testing.T) {
 	t.Cleanup(srv.Close)
 	client := jira.NewClient(jira.Config{Server: srv.URL})
 
-	write := adfDescriptionWrite(client, "TEST-1", json.RawMessage(adfDocFixture))
+	write := adfFieldsWrite(client, &editParams{issueKey: "TEST-1", adfDoc: json.RawMessage(adfDocFixture)})
 	require.NoError(t, write(true))
 
 	// The user's document is not merged with the current description, so

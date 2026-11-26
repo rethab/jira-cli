@@ -132,7 +132,7 @@ func (c *Client) getIssueComment(base, key, id string) (*Comment, error) {
 }
 
 type issueCommentEditRequest struct {
-	Body       string             `json:"body"`
+	Body       any                `json:"body"` // string in v2, ADF in v3
 	Visibility *CommentVisibility `json:"visibility,omitempty"`
 	Properties []CommentProperty  `json:"properties,omitempty"`
 }
@@ -143,13 +143,24 @@ type issueCommentEditRequest struct {
 // back with the new body. A PUT that omits them can reset them, which would
 // publish an internal comment.
 func (c *Client) EditIssueComment(key, id, comment string) error {
+	return c.editIssueComment(key, id, c.ToJiraMD(comment), apiVersion2)
+}
+
+// EditIssueCommentADF replaces the body of a comment with an ADF document sent as is via
+// PUT /rest/api/3/issue/{key}/comment/{id}, keeping its visibility and internal flag.
+func (c *Client) EditIssueCommentADF(key, id string, body json.RawMessage) error {
+	return c.editIssueComment(key, id, body, apiVersion3)
+}
+
+func (c *Client) editIssueComment(key, id string, body any, ver string) error {
+	// Visibility and properties read the same on v2 and v3, so v2 serves both writes.
 	existing, err := c.GetIssueCommentV2(key, id)
 	if err != nil {
 		return err
 	}
 
 	req := issueCommentEditRequest{
-		Body:       c.ToJiraMD(comment),
+		Body:       body,
 		Visibility: existing.Visibility,
 	}
 	for _, p := range existing.Properties {
@@ -158,16 +169,23 @@ func (c *Client) EditIssueComment(key, id, comment string) error {
 		}
 	}
 
-	body, err := json.Marshal(&req)
+	payload, err := json.Marshal(&req)
 	if err != nil {
 		return err
 	}
 
 	path := fmt.Sprintf("/issue/%s/comment/%s", key, id)
-	res, err := c.PutV2(context.Background(), path, body, Header{
+	headers := Header{
 		"Accept":       "application/json",
 		"Content-Type": "application/json",
-	})
+	}
+
+	var res *http.Response
+	if ver == apiVersion2 {
+		res, err = c.PutV2(context.Background(), path, payload, headers)
+	} else {
+		res, err = c.Put(context.Background(), path, payload, headers)
+	}
 	if err != nil {
 		return err
 	}
