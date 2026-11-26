@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/rethab/jira-cli/internal/cmdcommon"
-	"github.com/rethab/jira-cli/internal/cmdutil"
 	"github.com/rethab/jira-cli/pkg/jira"
 )
 
@@ -64,28 +63,30 @@ func checkCustomADF(params *editParams, local bool) error {
 	if params.adfBody == "-" {
 		readers++
 	}
-	for _, v := range params.customADF {
-		if v.path == "-" {
-			readers++
-		}
-	}
-	if readers > 1 {
+	if readers+customADFStdinReaders(params.customADF) > 1 {
 		return errors.New(stdinReaders)
 	}
 
 	return nil
 }
 
+func customADFStdinReaders(values []customADFValue) int {
+	n := 0
+	for _, v := range values {
+		if v.path == "-" {
+			n++
+		}
+	}
+	return n
+}
+
 // Like loadADFBody, this runs before the issue is fetched so that a bad file fails
 // with nothing written.
 func loadCustomADF(params *editParams) error {
 	for i, v := range params.customADF {
-		b, err := cmdutil.ReadFile(v.path)
-		if err != nil {
-			return fmt.Errorf("unable to read --custom-adf %s: %w", v.key, err)
-		}
-		params.customADF[i].doc, _, err = cmdcommon.ParseADFDocument(
-			b, "--custom-adf "+v.key, ".fields.<field id> of jira issue view --raw")
+		var err error
+		params.customADF[i].doc, _, err = cmdcommon.ReadADFDocument(
+			v.path, "--custom-adf "+v.key, ".fields.<field id> of jira issue view --raw")
 		if err != nil {
 			return err
 		}

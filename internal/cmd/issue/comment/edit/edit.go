@@ -107,7 +107,6 @@ func edit(cmd *cobra.Command, args []string) {
 	var adfDoc json.RawMessage
 	if cmd.Flags().Changed("adf-body") {
 		cmdutil.ExitIfError(checkADFBody(adfBodyFlags{
-			set:      true,
 			path:     adfBody,
 			body:     body,
 			template: template,
@@ -123,21 +122,36 @@ func edit(cmd *cobra.Command, args []string) {
 
 	client := api.DefaultClient(viper.GetBool("debug"))
 
-	if adfDoc != nil {
-		confirmEdit(noInput)
-
-		err = func() error {
-			s := cmdutil.Info("Updating comment")
-			defer s.Stop()
-
-			return client.EditIssueCommentADF(issueKey, commentID, adfDoc)
-		}()
-		cmdutil.ExitIfError(err)
-
-		reportUpdated(issueKey, commentID)
-		return
+	update := func() error { return client.EditIssueCommentADF(issueKey, commentID, adfDoc) }
+	if adfDoc == nil {
+		body = markdownBody(client, issueKey, commentID, body, template, noInput)
+		update = func() error { return client.EditIssueComment(issueKey, commentID, body) }
 	}
 
+	if !noInput {
+		answer := struct{ Action string }{}
+		cmdutil.ExitIfError(survey.Ask([]*survey.Question{nextAction()}, &answer))
+
+		if answer.Action == cmdcommon.ActionCancel {
+			cmdutil.Failed("Action aborted")
+		}
+	}
+
+	err = func() error {
+		s := cmdutil.Info("Updating comment")
+		defer s.Stop()
+
+		return update()
+	}()
+	cmdutil.ExitIfError(err)
+
+	cmdutil.Success("Comment %q of issue %q updated", commentID, issueKey)
+	fmt.Println(cmdutil.GenerateServerBrowseURL(viper.GetString("server"), issueKey))
+}
+
+// markdownBody returns the new body when it is given as Markdown, from the arguments, the
+// template, standard input or the editor, with mentions resolved.
+func markdownBody(client *jira.Client, issueKey, commentID, body, template string, noInput bool) string {
 	// Stdin is only read when no body was passed, so a script that gives one
 	// never blocks on a pipe nobody closes.
 	if body == "" && (template != "" || cmdutil.StdinHasData()) {
@@ -156,36 +170,7 @@ func edit(cmd *cobra.Command, args []string) {
 		body = askBody(client, issueKey, commentID)
 	}
 
-	body = cmdcommon.ResolveMentions(client, issueKey, "", body, noInput)
-
-	confirmEdit(noInput)
-
-	err = func() error {
-		s := cmdutil.Info("Updating comment")
-		defer s.Stop()
-
-		return client.EditIssueComment(issueKey, commentID, body)
-	}()
-	cmdutil.ExitIfError(err)
-
-	reportUpdated(issueKey, commentID)
-}
-
-func confirmEdit(noInput bool) {
-	if noInput {
-		return
-	}
-	answer := struct{ Action string }{}
-	cmdutil.ExitIfError(survey.Ask([]*survey.Question{nextAction()}, &answer))
-
-	if answer.Action == cmdcommon.ActionCancel {
-		cmdutil.Failed("Action aborted")
-	}
-}
-
-func reportUpdated(issueKey, commentID string) {
-	cmdutil.Success("Comment %q of issue %q updated", commentID, issueKey)
-	fmt.Println(cmdutil.GenerateServerBrowseURL(viper.GetString("server"), issueKey))
+	return cmdcommon.ResolveMentions(client, issueKey, "", body, noInput)
 }
 
 // askBody opens the editor on the comment's current body. The body is turned

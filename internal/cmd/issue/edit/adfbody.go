@@ -6,7 +6,6 @@ import (
 	"slices"
 
 	"github.com/rethab/jira-cli/internal/cmdcommon"
-	"github.com/rethab/jira-cli/internal/cmdutil"
 	"github.com/rethab/jira-cli/pkg/adf"
 	"github.com/rethab/jira-cli/pkg/jira"
 )
@@ -25,11 +24,8 @@ func loadADFBody(params *editParams) error {
 	if params.adfBody == "" {
 		return nil
 	}
-	b, err := cmdutil.ReadFile(params.adfBody)
-	if err != nil {
-		return fmt.Errorf("unable to read --adf-body: %w", err)
-	}
-	params.adfDoc, params.adfParsed, err = cmdcommon.ParseADFDocument(b, "--adf-body", ".fields.description of jira issue view --raw")
+	var err error
+	params.adfDoc, params.adfParsed, err = cmdcommon.ReadADFDocument(params.adfBody, "--adf-body", ".fields.description of jira issue view --raw")
 	return err
 }
 

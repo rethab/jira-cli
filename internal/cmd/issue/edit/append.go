@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"slices"
 	"strings"
 
 	"github.com/rethab/jira-cli/internal/cmdcommon"
@@ -53,7 +52,7 @@ func checkAddition(flag, value string, set bool, params *editParams) error {
 func shouldReadBodyFromStdin(params *editParams, stdinHasData bool) bool {
 	return params.body == "" && params.template == "" && params.adfBody == "" &&
 		params.appendBody == "" && params.prependBody == "" && len(params.replacements) == 0 &&
-		!slices.ContainsFunc(params.customADF, func(v customADFValue) bool { return v.path == "-" }) && stdinHasData
+		customADFStdinReaders(params.customADF) == 0 && stdinHasData
 }
 
 // The description and ADF fields are written by requests of their own, so an edit request

@@ -20,38 +20,36 @@ func TestCheckADFBody(t *testing.T) {
 		local   bool
 		wantErr string
 	}{
-		{name: "not set", in: adfBodyFlags{body: "text"}},
-		{name: "cloud", in: adfBodyFlags{set: true, path: "doc.json"}},
-		{name: "stdin", in: adfBodyFlags{set: true, path: "-"}},
+		{name: "cloud", in: adfBodyFlags{path: "doc.json"}},
+		{name: "stdin", in: adfBodyFlags{path: "-"}},
 		{
 			name:    "set but empty",
-			in:      adfBodyFlags{set: true},
+			in:      adfBodyFlags{},
 			wantErr: "--adf-body needs a path, or - for standard input",
 		},
 		{
 			name:    "with a body",
-			in:      adfBodyFlags{set: true, path: "doc.json", body: "text"},
+			in:      adfBodyFlags{path: "doc.json", body: "text"},
 			wantErr: "--adf-body can't be combined with a body, --body or --template",
 		},
 		{
 			name:    "with --template",
-			in:      adfBodyFlags{set: true, path: "doc.json", template: "t.tmpl"},
+			in:      adfBodyFlags{path: "doc.json", template: "t.tmpl"},
 			wantErr: "--adf-body can't be combined with a body, --body or --template",
 		},
 		{
 			name:  "refused on Jira Server and Data Center",
-			in:    adfBodyFlags{set: true, path: "doc.json"},
+			in:    adfBodyFlags{path: "doc.json"},
 			local: true,
 			wantErr: "--adf-body needs Jira Cloud; Jira Server and Data Center store comments as wiki markup, " +
 				"use --body or --template",
 		},
 		{
 			name:    "empty wins over the installation check",
-			in:      adfBodyFlags{set: true},
+			in:      adfBodyFlags{},
 			local:   true,
 			wantErr: "--adf-body needs a path, or - for standard input",
 		},
-		{name: "not set on Jira Server", in: adfBodyFlags{body: "text"}, local: true},
 	}
 
 	for _, tc := range tests {

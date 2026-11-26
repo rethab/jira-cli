@@ -1,10 +1,6 @@
 package edit
 
 import (
-	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rethab/jira-cli/pkg/adf"
-	"github.com/rethab/jira-cli/pkg/jira"
 )
 
 const (
@@ -135,24 +130,4 @@ func TestLoadADFBody(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not valid JSON")
 	})
-}
-
-func TestAdfDescriptionWriteSendsTheDocumentOnly(t *testing.T) {
-	var requests []string
-	var body []byte
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests = append(requests, r.Method+" "+r.URL.RequestURI())
-		body, _ = io.ReadAll(r.Body)
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	t.Cleanup(srv.Close)
-	client := jira.NewClient(jira.Config{Server: srv.URL})
-
-	write := adfFieldsWrite(client, &editParams{issueKey: "TEST-1", adfDoc: json.RawMessage(adfDocFixture)})
-	require.NoError(t, write(true))
-
-	// The user's document is not merged with the current description, so
-	// there is nothing to read first.
-	assert.Equal(t, []string{"PUT /rest/api/3/issue/TEST-1?notifyUsers=false"}, requests)
-	assert.JSONEq(t, `{"fields":{"description":`+adfDocFixture+`}}`, string(body))
 }

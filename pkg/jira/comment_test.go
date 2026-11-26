@@ -131,183 +131,133 @@ func TestGetIssueCommentsStopsOnEmptyPage(t *testing.T) {
 }
 
 func TestEditIssueComment(t *testing.T) {
-	tests := []struct {
-		name         string
-		existing     string
-		expectedBody string
-	}{
-		{
-			name:         "public comment",
-			existing:     `{"id":"10","body":"old"}`,
-			expectedBody: `{"body":"*new*"}`,
-		},
-		{
-			name:         "internal comment stays internal",
-			existing:     `{"id":"10","body":"old","properties":[{"key":"other","value":1},{"key":"sd.public.comment","value":{"internal":true}}]}`,
-			expectedBody: `{"body":"*new*","properties":[{"key":"sd.public.comment","value":{"internal":true}}]}`,
-		},
-		{
-			name:         "restricted comment stays restricted",
-			existing:     `{"id":"10","body":"old","visibility":{"type":"role","value":"Developers"}}`,
-			expectedBody: `{"body":"*new*","visibility":{"type":"role","value":"Developers"}}`,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			var unexpectedStatusCode bool
-
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/rest/api/2/issue/TEST-1/comment/10", r.URL.Path)
-
-				if r.Method == "GET" {
-					assert.Equal(t, "expand=properties", r.URL.RawQuery)
-					w.Header().Set("Content-Type", "application/json")
-					_, _ = w.Write([]byte(tc.existing))
-					return
-				}
-
-				assert.Equal(t, "PUT", r.Method)
-				assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-
-				actual, _ := io.ReadAll(r.Body)
-				assert.JSONEq(t, tc.expectedBody, string(actual))
-
-				if unexpectedStatusCode {
-					w.WriteHeader(400)
-				} else {
-					w.WriteHeader(200)
-				}
-			}))
-			defer server.Close()
-
-			client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
-
-			err := client.EditIssueComment("TEST-1", "10", "**new**")
-			assert.NoError(t, err)
-
-			unexpectedStatusCode = true
-
-			err = client.EditIssueComment("TEST-1", "10", "**new**")
-			assertUnexpectedResponse(t, err)
-		})
-	}
-}
-
-func TestEditIssueCommentNotFound(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "GET", r.Method)
-		w.WriteHeader(404)
-	}))
-	defer server.Close()
-
-	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
-
-	err := client.EditIssueComment("TEST-1", "10", "new")
-	assertUnexpectedResponse(t, err)
-}
-
-func TestEditIssueCommentADF(t *testing.T) {
-	// Everything here is something adf.Node doesn't model or a converter would
-	// flatten, so the test fails if the document goes through either.
-	const doc = `{"version":1,"type":"doc","content":[
+	// Everything in adfDoc is something adf.Node doesn't model or a converter would
+	// flatten, so the ADF variant fails if the document goes through either.
+	const adfDoc = `{"version":1,"type":"doc","content":[
 		{"type":"paragraph","attrs":{"localId":"abc"},"content":[
 			{"type":"text","text":"Deploy on Monday, see "},
 			{"type":"inlineCard","attrs":{"url":"https://example.atlassian.net/browse/TEST-2"}},
 			{"type":"text","text":" and ask "},
-			{"type":"mention","attrs":{"id":"5b10ac8d82e05b22cc7d4ef5","text":"@Jane Doe"}},
+			{"type":"mention","attrs":{"id":"5b10a2844c20165700ede21g","text":"@Jane Doe"}},
 			{"type":"text","text":" to run "},
 			{"type":"text","text":"make release","marks":[{"type":"code"}]},
 			{"type":"status","attrs":{"text":"DONE","color":"green"}}]}
 	]}`
 
-	tests := []struct {
-		name         string
-		existing     string
-		expectedBody string
+	variants := []struct {
+		name    string
+		putPath string
+		body    string
+		edit    func(c *Client) error
 	}{
 		{
-			name:         "public comment",
-			existing:     `{"id":"10","body":"old"}`,
-			expectedBody: `{"body":` + doc + `}`,
+			name:    "markdown",
+			putPath: "/rest/api/2/issue/TEST-1/comment/10",
+			body:    `"*new*"`,
+			edit:    func(c *Client) error { return c.EditIssueComment("TEST-1", "10", "**new**") },
+		},
+		{
+			name:    "adf",
+			putPath: "/rest/api/3/issue/TEST-1/comment/10",
+			body:    adfDoc,
+			edit:    func(c *Client) error { return c.EditIssueCommentADF("TEST-1", "10", json.RawMessage(adfDoc)) },
+		},
+	}
+
+	tests := []struct {
+		name     string
+		existing string
+		kept     string
+	}{
+		{
+			name:     "public comment",
+			existing: `{"id":"10","body":"old"}`,
 		},
 		{
 			name:     "internal comment stays internal",
 			existing: `{"id":"10","body":"old","properties":[{"key":"other","value":1},{"key":"sd.public.comment","value":{"internal":true}}]}`,
-			expectedBody: `{"body":` + doc +
-				`,"properties":[{"key":"sd.public.comment","value":{"internal":true}}]}`,
+			kept:     `,"properties":[{"key":"sd.public.comment","value":{"internal":true}}]`,
 		},
 		{
 			name:     "restricted comment stays restricted",
 			existing: `{"id":"10","body":"old","visibility":{"type":"role","value":"Developers"}}`,
-			expectedBody: `{"body":` + doc +
-				`,"visibility":{"type":"role","value":"Developers"}}`,
+			kept:     `,"visibility":{"type":"role","value":"Developers"}`,
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			var (
-				unexpectedStatusCode bool
-				requests             []string
-			)
+	for _, v := range variants {
+		for _, tc := range tests {
+			t.Run(v.name+": "+tc.name, func(t *testing.T) {
+				var (
+					unexpectedStatusCode bool
+					requests             []string
+				)
 
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					requests = append(requests, r.Method+" "+r.URL.RequestURI())
+
+					if r.Method == "GET" {
+						assert.Equal(t, "/rest/api/2/issue/TEST-1/comment/10", r.URL.Path)
+						assert.Equal(t, "expand=properties", r.URL.RawQuery)
+						w.Header().Set("Content-Type", "application/json")
+						_, _ = w.Write([]byte(tc.existing))
+						return
+					}
+
+					assert.Equal(t, "PUT", r.Method)
+					assert.Equal(t, v.putPath, r.URL.Path)
+					assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+					actual, _ := io.ReadAll(r.Body)
+					assert.JSONEq(t, `{"body":`+v.body+tc.kept+`}`, string(actual))
+
+					if unexpectedStatusCode {
+						w.WriteHeader(400)
+					} else {
+						w.WriteHeader(200)
+					}
+				}))
+				defer server.Close()
+
+				client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
+
+				assert.NoError(t, v.edit(client))
+				assert.Equal(t, []string{
+					"GET /rest/api/2/issue/TEST-1/comment/10?expand=properties",
+					"PUT " + v.putPath,
+				}, requests)
+
+				unexpectedStatusCode = true
+
+				assertUnexpectedResponse(t, v.edit(client))
+			})
+		}
+	}
+}
+
+func TestEditIssueCommentNotFound(t *testing.T) {
+	edits := map[string]func(c *Client) error{
+		"markdown": func(c *Client) error { return c.EditIssueComment("TEST-1", "10", "new") },
+		"adf": func(c *Client) error {
+			return c.EditIssueCommentADF("TEST-1", "10", json.RawMessage(`{"version":1,"type":"doc","content":[]}`))
+		},
+	}
+
+	for name, edit := range edits {
+		t.Run(name, func(t *testing.T) {
+			var methods []string
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				requests = append(requests, r.Method+" "+r.URL.RequestURI())
-
-				if r.Method == "GET" {
-					assert.Equal(t, "/rest/api/2/issue/TEST-1/comment/10", r.URL.Path)
-					assert.Equal(t, "expand=properties", r.URL.RawQuery)
-					w.Header().Set("Content-Type", "application/json")
-					_, _ = w.Write([]byte(tc.existing))
-					return
-				}
-
-				assert.Equal(t, "PUT", r.Method)
-				assert.Equal(t, "/rest/api/3/issue/TEST-1/comment/10", r.URL.Path)
-				assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-
-				actual, _ := io.ReadAll(r.Body)
-				assert.JSONEq(t, tc.expectedBody, string(actual))
-
-				if unexpectedStatusCode {
-					w.WriteHeader(400)
-				} else {
-					w.WriteHeader(200)
-				}
+				methods = append(methods, r.Method)
+				w.WriteHeader(404)
 			}))
 			defer server.Close()
 
 			client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
 
-			err := client.EditIssueCommentADF("TEST-1", "10", json.RawMessage(doc))
-			assert.NoError(t, err)
-			assert.Equal(t, []string{
-				"GET /rest/api/2/issue/TEST-1/comment/10?expand=properties",
-				"PUT /rest/api/3/issue/TEST-1/comment/10",
-			}, requests)
-
-			unexpectedStatusCode = true
-
-			err = client.EditIssueCommentADF("TEST-1", "10", json.RawMessage(doc))
-			assertUnexpectedResponse(t, err)
+			assertUnexpectedResponse(t, edit(client))
+			assert.Equal(t, []string{"GET"}, methods)
 		})
 	}
-}
-
-func TestEditIssueCommentADFNotFound(t *testing.T) {
-	var methods []string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		methods = append(methods, r.Method)
-		w.WriteHeader(404)
-	}))
-	defer server.Close()
-
-	client := NewClient(Config{Server: server.URL}, WithTimeout(3*time.Second))
-
-	err := client.EditIssueCommentADF("TEST-1", "10", json.RawMessage(`{"version":1,"type":"doc","content":[]}`))
-	assertUnexpectedResponse(t, err)
-	assert.Equal(t, []string{"GET"}, methods)
 }
 
 func TestDeleteIssueComment(t *testing.T) {

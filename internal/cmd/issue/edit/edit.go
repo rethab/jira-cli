@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -172,7 +171,7 @@ func edit(cmd *cobra.Command, args []string) {
 	params.appendBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.appendBody, params.noInput)
 	params.prependBody = cmdcommon.ResolveMentions(client, params.issueKey, project, params.prependBody, params.noInput)
 
-	writes, err := v3Writes(client, params)
+	writes, err := v3Writes(client, params, local)
 	if err != nil {
 		cmdutil.Failed("Nothing was updated: %s", err)
 	}
@@ -228,7 +227,7 @@ type v3Write struct {
 // These are requests of their own, which are returned instead of made so that building
 // them fails before the other fields are saved. Jira only validates an --adf-body or
 // --custom-adf document when it is written, so that can still fail after.
-func v3Writes(client *jira.Client, params *editParams) ([]v3Write, error) {
+func v3Writes(client *jira.Client, params *editParams, local bool) ([]v3Write, error) {
 	var writes []v3Write
 
 	if params.prependBody != "" || params.appendBody != "" || len(params.replacements) > 0 {
@@ -238,7 +237,7 @@ func v3Writes(client *jira.Client, params *editParams) ([]v3Write, error) {
 			appendMd:     params.appendBody,
 		}
 		s := cmdutil.Info("Fetching the description...")
-		write, err := changeDescription(client, params.issueKey, change, viper.GetString("installation") == jira.InstallationTypeLocal)
+		write, err := changeDescription(client, params.issueKey, change, local)
 		s.Stop()
 		if err != nil {
 			return nil, err
@@ -626,7 +625,7 @@ func parseArgsAndFlags(flags query.FlagParser, args []string, project string) *e
 	// Reading the template consumes stdin, so there is nothing left to prompt on.
 	// An explicit --body wins over the template, in which case stdin is left alone.
 	if (template == "-" && body == "") || adfBody == "-" ||
-		slices.ContainsFunc(customADF, func(v customADFValue) bool { return v.path == "-" }) {
+		customADFStdinReaders(customADF) > 0 {
 		noInput = true
 	}
 

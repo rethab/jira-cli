@@ -143,16 +143,18 @@ type issueCommentEditRequest struct {
 // back with the new body. A PUT that omits them can reset them, which would
 // publish an internal comment.
 func (c *Client) EditIssueComment(key, id, comment string) error {
-	return c.editIssueComment(key, id, c.ToJiraMD(comment), apiVersion2)
+	return c.editIssueComment(key, id, c.ToJiraMD(comment), c.PutV2)
 }
 
 // EditIssueCommentADF replaces the body of a comment with an ADF document sent as is via
 // PUT /rest/api/3/issue/{key}/comment/{id}, keeping its visibility and internal flag.
 func (c *Client) EditIssueCommentADF(key, id string, body json.RawMessage) error {
-	return c.editIssueComment(key, id, body, apiVersion3)
+	return c.editIssueComment(key, id, body, c.Put)
 }
 
-func (c *Client) editIssueComment(key, id string, body any, ver string) error {
+func (c *Client) editIssueComment(
+	key, id string, body any, put func(context.Context, string, []byte, Header) (*http.Response, error),
+) error {
 	// Visibility and properties read the same on v2 and v3, so v2 serves both writes.
 	existing, err := c.GetIssueCommentV2(key, id)
 	if err != nil {
@@ -175,17 +177,10 @@ func (c *Client) editIssueComment(key, id string, body any, ver string) error {
 	}
 
 	path := fmt.Sprintf("/issue/%s/comment/%s", key, id)
-	headers := Header{
+	res, err := put(context.Background(), path, payload, Header{
 		"Accept":       "application/json",
 		"Content-Type": "application/json",
-	}
-
-	var res *http.Response
-	if ver == apiVersion2 {
-		res, err = c.PutV2(context.Background(), path, payload, headers)
-	} else {
-		res, err = c.Put(context.Background(), path, payload, headers)
-	}
+	})
 	if err != nil {
 		return err
 	}

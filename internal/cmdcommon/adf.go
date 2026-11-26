@@ -5,8 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/rethab/jira-cli/internal/cmdutil"
 	"github.com/rethab/jira-cli/pkg/adf"
 )
+
+// ReadADFDocument reads the ADF document passed to flag from path, or standard input for -, and parses it
+// with ParseADFDocument.
+func ReadADFDocument(path, flag, source string) (json.RawMessage, *adf.ADF, error) {
+	b, err := cmdutil.ReadFile(path)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to read %s: %w", flag, err)
+	}
+	return ParseADFDocument(b, flag, source)
+}
 
 // ParseADFDocument checks the root of an ADF document passed to flag and returns the bytes to send unchanged.
 // source says where the document comes from, eg ".fields.description of jira issue view --raw", for the hint

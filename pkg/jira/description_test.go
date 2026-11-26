@@ -191,44 +191,6 @@ func TestSetIssueDescription(t *testing.T) {
 	})
 }
 
-func TestSetIssueDescriptionADF(t *testing.T) {
-	// Everything here is something adf.Node doesn't model, so a round trip
-	// through it would drop it.
-	const doc = `{"version":1,"type":"doc","content":[
-		{"type":"paragraph","attrs":{"localId":"abc"},"content":[
-			{"type":"status","attrs":{"text":"DONE","color":"green"}},
-			{"type":"inlineCard","attrs":{"url":"https://example.atlassian.net/browse/TEST-2"}}]},
-		{"type":"expand","attrs":{"title":"More"},"content":[
-			{"type":"paragraph","content":[{"type":"text","text":"hidden"}]}]}
-	]}`
-
-	t.Run("sends the document to v3 as is", func(t *testing.T) {
-		client, got := captureWrite(t, http.StatusNoContent, "")
-
-		assert.NoError(t, client.SetIssueDescriptionADF("TEST-1", json.RawMessage(doc), false))
-		assert.Equal(t, http.MethodPut, got.method)
-		assert.Equal(t, "/rest/api/3/issue/TEST-1", got.path)
-		assert.Empty(t, got.query)
-		assert.JSONEq(t, `{"fields":{"description":`+doc+`}}`, got.body)
-	})
-
-	t.Run("skip notify", func(t *testing.T) {
-		client, got := captureWrite(t, http.StatusNoContent, "")
-
-		assert.NoError(t, client.SetIssueDescriptionADF("TEST-1", json.RawMessage(doc), true))
-		assert.Equal(t, "notifyUsers=false", got.query)
-	})
-
-	t.Run("unexpected response", func(t *testing.T) {
-		client, _ := captureWrite(t, http.StatusBadRequest, `{"errorMessages":[],"errors":{"description":"INVALID_INPUT"}}`)
-
-		err := client.SetIssueDescriptionADF("TEST-1", json.RawMessage(doc), false)
-		var unexpected *ErrUnexpectedResponse
-		require.ErrorAs(t, err, &unexpected)
-		assert.Equal(t, http.StatusBadRequest, unexpected.StatusCode)
-	})
-}
-
 func TestSetIssueFieldsADF(t *testing.T) {
 	const (
 		field = `{"version":1,"type":"doc","content":[{"type":"paragraph","content":[` +

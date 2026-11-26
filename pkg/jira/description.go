@@ -57,15 +57,9 @@ func (c *Client) SetIssueDescription(key string, doc *adf.ADF, skipNotify bool) 
 	return c.setFields(key, map[string]any{"description": doc}, skipNotify, apiVersion3)
 }
 
-// SetIssueDescriptionADF replaces the description with an ADF document sent as is via
-// PUT /rest/api/3/issue/{key}. Unlike SetIssueDescription it doesn't go through adf.ADF,
-// which would drop whatever node attributes it doesn't model.
-func (c *Client) SetIssueDescriptionADF(key string, doc json.RawMessage, skipNotify bool) error {
-	return c.SetIssueFieldsADF(key, map[string]json.RawMessage{"description": doc}, skipNotify)
-}
-
 // SetIssueFieldsADF sets fields that take ADF (description, textarea custom fields) to documents sent as is
-// via PUT /rest/api/3/issue/{key}.
+// via PUT /rest/api/3/issue/{key}. Unlike SetIssueDescription they don't go through adf.ADF, which would drop
+// whatever node attributes it doesn't model.
 func (c *Client) SetIssueFieldsADF(key string, fields map[string]json.RawMessage, skipNotify bool) error {
 	return c.setFields(key, fields, skipNotify, apiVersion3)
 }

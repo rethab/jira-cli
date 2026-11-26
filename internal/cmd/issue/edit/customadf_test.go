@@ -231,52 +231,59 @@ func TestResolveCustomADF(t *testing.T) {
 	})
 }
 
-func TestOnlyV3WritesWithCustomADF(t *testing.T) {
-	customADF := []customADFValue{{key: "f", path: "doc.json"}}
-
-	assert.True(t, onlyV3Writes(&editParams{customADF: customADF}))
-	assert.True(t, onlyV3Writes(&editParams{customADF: customADF, adfBody: "doc.json"}))
-	assert.True(t, onlyV3Writes(&editParams{customADF: customADF, appendBody: "a"}))
-	assert.False(t, onlyV3Writes(&editParams{customADF: customADF, summary: "s"}))
-	assert.False(t, onlyV3Writes(&editParams{customADF: customADF, customFields: map[string]string{"g": "x"}}))
-}
-
-func TestShouldReadBodyFromStdinWithCustomADF(t *testing.T) {
-	assert.False(t, shouldReadBodyFromStdin(&editParams{customADF: []customADFValue{{key: "f", path: "-"}}}, true))
-	assert.True(t, shouldReadBodyFromStdin(&editParams{customADF: []customADFValue{{key: "f", path: "doc.json"}}}, true))
-}
-
-func TestADFFieldsWriteSendsOneRequest(t *testing.T) {
-	var (
-		requests []string
-		body     []byte
-	)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests = append(requests, r.Method+" "+r.URL.RequestURI())
-		body, _ = io.ReadAll(r.Body)
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	t.Cleanup(srv.Close)
-	client := jira.NewClient(jira.Config{Server: srv.URL})
-
+func TestADFFieldsWrite(t *testing.T) {
 	const other = `{"version":1,"type":"doc","content":[{"type":"paragraph","content":[` +
 		`{"type":"status","attrs":{"text":"DONE","color":"green"}}]}]}`
-	params := &editParams{
-		issueKey: "TEST-1",
-		adfDoc:   json.RawMessage(adfDocFixture),
-		customADFFields: map[string]json.RawMessage{
-			"customfield_10050": json.RawMessage(adfDocFixture),
-			"customfield_10051": json.RawMessage(other),
+
+	tests := []struct {
+		name   string
+		params *editParams
+		want   string
+	}{
+		{
+			// The user's document is not merged with the current description, so
+			// there is nothing to read first.
+			name:   "the description only",
+			params: &editParams{issueKey: "TEST-1", adfDoc: json.RawMessage(adfDocFixture)},
+			want:   `{"fields":{"description":` + adfDocFixture + `}}`,
+		},
+		{
+			name: "the description and custom fields in one request",
+			params: &editParams{
+				issueKey: "TEST-1",
+				adfDoc:   json.RawMessage(adfDocFixture),
+				customADFFields: map[string]json.RawMessage{
+					"customfield_10050": json.RawMessage(adfDocFixture),
+					"customfield_10051": json.RawMessage(other),
+				},
+			},
+			want: `{"fields":{"description":` + adfDocFixture +
+				`,"customfield_10050":` + adfDocFixture + `,"customfield_10051":` + other + `}}`,
 		},
 	}
 
-	write := adfFieldsWrite(client, params)
-	require.NotNil(t, write)
-	require.NoError(t, write(true))
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				requests []string
+				body     []byte
+			)
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests = append(requests, r.Method+" "+r.URL.RequestURI())
+				body, _ = io.ReadAll(r.Body)
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			t.Cleanup(srv.Close)
+			client := jira.NewClient(jira.Config{Server: srv.URL})
 
-	assert.Equal(t, []string{"PUT /rest/api/3/issue/TEST-1?notifyUsers=false"}, requests)
-	assert.JSONEq(t, `{"fields":{"description":`+adfDocFixture+
-		`,"customfield_10050":`+adfDocFixture+`,"customfield_10051":`+other+`}}`, string(body))
+			write := adfFieldsWrite(client, tc.params)
+			require.NotNil(t, write)
+			require.NoError(t, write(true))
+
+			assert.Equal(t, []string{"PUT /rest/api/3/issue/TEST-1?notifyUsers=false"}, requests)
+			assert.JSONEq(t, tc.want, string(body))
+		})
+	}
 }
 
 func TestADFFieldsWriteWithNothingToWrite(t *testing.T) {
