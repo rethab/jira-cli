@@ -7,6 +7,7 @@ import (
 	"testing"
 	"unicode"
 
+	"github.com/fatih/color"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/rethab/jira-cli/pkg/adf"
@@ -231,7 +232,7 @@ func TestIssueDetailsWithV2Description(t *testing.T) {
 	}
 	assert.NoError(t, issue.renderPlain(&b))
 
-	expected := "Type: Bug  Status: Done  Updated: Sun, 13 Dec 20  Assignee: Person A  Key: TEST-1  Parent: TEST-0  Comments: 3  Linked: 2\n# This is a test\nCreated: Sun, 13 Dec 20  Reporter: Person Z  Priority: High  Components: BE, FE  Labels: None  Watchers: 0 watchers\n\n------------------------ Description ------------------------\n\n# Title\n## Subtitle\n\nThis is a **bold** and _italic_ text with [a link](https://ankit.pl) in between.\n\n\n------------------------ 2 Subtasks ------------------------\n\n\n SUBTASKS\n\n  TEST-2 Subtask 1 | High   | TO DO\n  TEST-3 Subtask 2 | Normal | Done \n\n\n\n------------------------ Linked Issues ------------------------\n\n\n BLOCKS\n\n  TEST-2 Something is broken   | Bug | High   | TO DO\n\n RELATES TO\n\n  TEST-3 Everything is on fire | Bug | Urgent | Done \n\n\n\n------------------------ 3 Comments ------------------------\n\n\n Person C | Wed, 24 Nov 21 | Latest comment\n\nTest comment C\n\n\n\n Person B | Tue, 23 Nov 21\n\nTest comment B\n\n"
+	expected := "Type: Bug  Status: Done  Updated: Sun, 13 Dec 20  Assignee: Person A  Key: TEST-1  Parent: TEST-0  Comments: 3  Linked: 2\n# This is a test\nCreated: Sun, 13 Dec 20  Reporter: Person Z  Priority: High  Components: BE, FE  Labels: None  Watchers: 0 watchers\n\n------------------------ Description ------------------------\n\n# Title\n## Subtitle\n\nThis is a **bold** and _italic_ text with [a link](https://ankit.pl) in between.\n\n\n------------------------ 2 Subtasks ------------------------\n\n\n SUBTASKS\n\n  TEST-2 Subtask 1 | High   | TO DO\n  TEST-3 Subtask 2 | Normal | Done \n\n\n\n------------------------ Linked Issues ------------------------\n\n\n BLOCKS\n\n  TEST-2 Something is broken   | Bug | High   | TO DO\n\n RELATES TO\n\n  TEST-3 Everything is on fire | Bug | Urgent | Done \n\n\n\n------------------------ 3 Comments ------------------------\n\n\n Person C | Wed, 24 Nov 21 | ID: 10035 | Latest comment\n\nTest comment C\n\n\n\n Person B | Tue, 23 Nov 21 | ID: 10034\n\nTest comment B\n\n"
 	if xterm256() {
 		expected += "\x1b[38;5;242mUse --comments <limit> with `jira issue view` to load more comments\x1b[m\n\n"
 		expected += "\x1b[38;5;242mView this issue on Jira: https://test.local/browse/TEST-1\x1b[m"
@@ -350,6 +351,70 @@ func decoratedIssue() *jira.Issue {
 			Updated: "2020-12-13T14:07:20.974+0100",
 		},
 	}
+}
+
+func TestIssueCommentMetaShowsID(t *testing.T) {
+	t.Parallel()
+
+	t.Run("plain", func(t *testing.T) {
+		t.Parallel()
+
+		issue := Issue{
+			Server:  "https://test.local",
+			Data:    decoratedIssue(),
+			Display: DisplayFormat{Plain: true},
+			Options: IssueOption{NumComments: 1},
+		}
+
+		assert.Contains(t, issue.comments()[0].meta, "| ID: 10033 | Latest comment")
+		assert.Contains(t, issue.String(), "ID: 10033")
+	})
+
+	t.Run("interactive", func(t *testing.T) {
+		t.Parallel()
+
+		issue := Issue{
+			Server:  "https://test.local",
+			Data:    decoratedIssue(),
+			Display: DisplayFormat{Plain: false},
+			Options: IssueOption{NumComments: 1},
+		}
+
+		assert.Contains(t, issue.comments()[0].meta, "• ID: 10033 • ")
+		assert.Contains(t, issue.String(), "ID: 10033")
+	})
+
+	t.Run("empty id", func(t *testing.T) {
+		t.Parallel()
+
+		data := decoratedIssue()
+		data.Fields.Comment.Comments[0].ID = ""
+		issue := Issue{
+			Server:  "https://test.local",
+			Data:    data,
+			Display: DisplayFormat{Plain: true},
+			Options: IssueOption{NumComments: 1},
+		}
+
+		assert.NotContains(t, issue.comments()[0].meta, "ID:")
+	})
+}
+
+// Not parallel: it flips the global color.NoColor, which is only safe once
+// the package's parallel tests are paused behind the sequential ones.
+func TestIssueCommentIDIsDimmed(t *testing.T) {
+	prev := color.NoColor
+	color.NoColor = false
+	t.Cleanup(func() { color.NoColor = prev })
+
+	issue := Issue{
+		Server:  "https://test.local",
+		Data:    decoratedIssue(),
+		Display: DisplayFormat{Plain: false},
+		Options: IssueOption{NumComments: 1},
+	}
+
+	assert.Contains(t, issue.comments()[0].meta, color.New(color.FgHiBlack).Sprint("ID: 10033"))
 }
 
 // adfBody is a body Jira cloud would return: a list, an inline card, a code

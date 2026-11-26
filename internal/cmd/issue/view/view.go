@@ -17,7 +17,7 @@ const (
 	helpText = `View displays contents of an issue.`
 	examples = `$ jira issue view ISSUE-1
 
-# Show 5 recent comments when viewing the issue
+# Show 5 recent comments, with the ids that "jira issue comment edit" takes
 $ jira issue view ISSUE-1 --comments 5
 
 # Get the raw JSON data

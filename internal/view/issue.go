@@ -494,6 +494,9 @@ func (i Issue) comments() []issueComment {
 			sep,
 			coloredOut(cmdutil.FormatDateTimeHuman(c.Created, jira.RFC3339), color.FgWhite, color.Bold),
 		)
+		if c.ID != "" {
+			meta += fmt.Sprintf(" %s %s", sep, coloredOut("ID: "+c.ID, color.FgHiBlack))
+		}
 		if idx == total-1 {
 			meta += fmt.Sprintf(" %s %s", sep, coloredOut("Latest comment", color.FgCyan, color.Bold))
 		}
