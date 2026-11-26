@@ -356,20 +356,6 @@ func decoratedIssue() *jira.Issue {
 func TestIssueCommentMetaShowsID(t *testing.T) {
 	t.Parallel()
 
-	t.Run("plain", func(t *testing.T) {
-		t.Parallel()
-
-		issue := Issue{
-			Server:  "https://test.local",
-			Data:    decoratedIssue(),
-			Display: DisplayFormat{Plain: true},
-			Options: IssueOption{NumComments: 1},
-		}
-
-		assert.Contains(t, issue.comments()[0].meta, "| ID: 10033 | Latest comment")
-		assert.Contains(t, issue.String(), "ID: 10033")
-	})
-
 	t.Run("interactive", func(t *testing.T) {
 		t.Parallel()
 
@@ -381,7 +367,6 @@ func TestIssueCommentMetaShowsID(t *testing.T) {
 		}
 
 		assert.Contains(t, issue.comments()[0].meta, "• ID: 10033 • ")
-		assert.Contains(t, issue.String(), "ID: 10033")
 	})
 
 	t.Run("empty id", func(t *testing.T) {

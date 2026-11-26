@@ -487,21 +487,18 @@ func (i Issue) comments() []issueComment {
 			body = c.Body.(string)
 			body = md.FromJiraMD(body)
 		}
-		sep := i.fieldSeparator()
-		meta := fmt.Sprintf(
-			"\n %s %s %s",
+		parts := []string{
 			coloredOut(userName(c.Author), color.FgWhite, color.Bold),
-			sep,
 			coloredOut(cmdutil.FormatDateTimeHuman(c.Created, jira.RFC3339), color.FgWhite, color.Bold),
-		)
+		}
 		if c.ID != "" {
-			meta += fmt.Sprintf(" %s %s", sep, coloredOut("ID: "+c.ID, color.FgHiBlack))
+			parts = append(parts, coloredOut("ID: "+c.ID, color.FgHiBlack))
 		}
 		if idx == total-1 {
-			meta += fmt.Sprintf(" %s %s", sep, coloredOut("Latest comment", color.FgCyan, color.Bold))
+			parts = append(parts, coloredOut("Latest comment", color.FgCyan, color.Bold))
 		}
 		comments = append(comments, issueComment{
-			meta: meta,
+			meta: "\n " + strings.Join(parts, " "+i.fieldSeparator()+" "),
 			body: body,
 		})
 	}

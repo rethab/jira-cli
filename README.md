@@ -727,7 +727,7 @@ not be the latest one if you for some reason have more than 5k comments in a tic
 which `jira issue comment edit`, `jira issue comment delete` and `jira issue comment add --reply-to` take.
 
 ```sh
-# Show 5 recent comments, with the ids that "jira issue comment edit" takes
+# Show 5 recent comments when viewing the issue
 $ jira issue view ISSUE-1 --comments 5
 
 # Print only the summary and description, e.g. to feed into another tool
@@ -904,9 +904,9 @@ EOF
 ```
 
 ##### List
-The `list` command shows the comments of an issue, oldest first, including the id you need to edit or delete a comment (`jira issue view --comments N` shows the ids too).
-On Jira Cloud the raw output has the comment bodies in Atlassian Document Format, on Server and Data Center in wiki
-markup.
+The `list` command shows the comments of an issue, oldest first, including the id you need to edit or delete a comment
+(`jira issue view --comments N` shows the ids too). On Jira Cloud the raw output has the comment bodies in Atlassian
+Document Format, on Server and Data Center in wiki markup.
 
 ```sh
 $ jira issue comment list ISSUE-1
